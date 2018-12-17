@@ -20,7 +20,7 @@ epoch_noise_zScore_th = 6;
 bad_time_percent = 0.3; %part of bad data in channel to mark it bad 
 LOW_PASS_HZ = 45;
 fp = 'D:\My Files\Work\BGU\datasets\Panas\';
-CHANNEL_LOCATION_FILE_INTERPOLATE = 'D:\My Files\Work\BGU\scripts\Mental Imagery\electrodes\chanlocs60.sfp';
+CHANNEL_LOCATION_FILE_INTERPOLATE = 'D:\My Files\Work\BGU\scripts\Mental-Imagery\electrodes\chanlocs60.sfp';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

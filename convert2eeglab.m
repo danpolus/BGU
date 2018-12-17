@@ -8,7 +8,7 @@
 clear all
 close all
 
-CHANNEL_LOCATION_FILE = 'D:\My Files\Work\BGU\scripts\Mental Imagery\electrodes\chanlocs64.sfp';
+CHANNEL_LOCATION_FILE = 'D:\My Files\Work\BGU\scripts\Mental-Imagery\electrodes\chanlocs64.sfp';
 fp = 'D:\My Files\Work\BGU\datasets\Panas\';
 dataset_name = 'eeg_data_wrt_task_rep_no_eog_256Hz_';
 conditions = {'end_trial', 'last_beep'};
