@@ -5,13 +5,6 @@
 clear all
 close all
 
-global ES_min...
-    ES_max...
-    ES_edges...
-    param;
-
-%%%%%%%%%%%%%%%%%
-
 fp = 'D:\My Files\Work\BGU\datasets\Panas\';
 [files, fp] = uigetfile([fp '*.set'], 'Select all subject scenario files','MultiSelect','on');
 if ~iscell(files) %in case only 1 file selected
@@ -20,11 +13,12 @@ end
 EEG = pop_loadset([fp files{1}]);
 
 %%%%%%%%%%%%%%%%%
+global param
 
 %Event Size - range of avalanche sizes
-ES_min = 1;
-ES_max = (floor(EEG.nbchan*2/100))*100;
-ES_edges = unique(ceil(logspace(0,log10(ES_max),25))); % log spaced bins
+param.ES.min = 1;
+param.ES.max = (floor(EEG.nbchan*2/100))*100;
+param.ES.edges = unique(ceil(logspace(0,log10(param.ES.max),25))); % log spaced bins
 %params
 param.MaxMin = 'maxmin'; % one of 3 options: 'maxmin', 'max', 'min'. default: 'maxmin'
 param.Fs = EEG.srate;
@@ -32,16 +26,19 @@ param.Fs = EEG.srate;
 param.t1 = 4; % sec
 param.t2 = 8; % sec
 %more input params
-param.tau_vec = (1:5)*(1/EEG.srate); % array with delta t values for avalanche analysis
+max_tau_sec = 0.04; %40msec
+param.tau_vec = 1/EEG.srate:1/EEG.srate:max_tau_sec; % array with delta t values for avalanche analysis
+param.optimal_alpha = -1.5;
+param.optimal_sigma = 1;
 
-std_TH = 3.0;
+std_TH = 3.0; %set ZsubjTh3 to appears in folder name
+% Zfile means that mean and std calculated per file
+% Zsubj means that mean and std calculated over all subject files for the same scenario
 
-zero_bad_epoch_channels_flg = true;
-zero_bad_chanels_flg = true;
-zero_subj_scenario_bad_channels_flg = false;
+zero_bad_epoch_channels_flg = true; %true -> BEfile_BC####, false ->BEnone_BCnone set to appear in folder name
+zero_bad_chanels_flg = true ;% false -> BCnone set to appear in folder name
+zero_subj_scenario_bad_channels_flg = false; %true -> BCsubj, false -> BCfile set to appear in folder name
 
-optimal_alpha = -1.5;
-optimal_sigma = 1;
 %%%%%%%%%%%%%%%%%%%%
 
 %calculate mean and std of the whole scenario for each channel
@@ -62,6 +59,26 @@ subj_scenario_bad_channels = unique(subj_scenario_bad_channels);
 clear('EEG_data_reshaped');
 
 for iFile = 1:length(files)
+    
+    file_info = [];
+    if contains(fp,'Long_words')
+        file_info.scenario = '1LongWords';
+    elseif contains(fp,'Short_long_words')
+        file_info.scenario = '2ShortLongWords';
+    elseif contains(fp,'Short_words')
+        file_info.scenario = '3ShortWords';
+    elseif contains(fp,'Vowels')
+        file_info.scenario = '4Vowels';
+    end
+    file_info.subj_id = files{iFile}(5:6);
+    if contains(files{iFile},'end_trial_word')
+        file_info.condition = '1rest';
+        file_info.word_num = files{iFile}(strfind(files{iFile},'end_trial_word') + length('end_trial_word'));
+    elseif contains(files{iFile},'last_beep_word')
+        file_info.condition = '2imagine';
+        file_info.word_num = files{iFile}(strfind(files{iFile},'last_beep_word') + length('last_beep_word'));
+    end
+    
     EEG = pop_loadset([fp files{iFile}]);
     
     %zscore
@@ -105,19 +122,19 @@ for iFile = 1:length(files)
     end    
     
     for iTau = 1:length(param.tau_vec)
-        all_epochs(iTau).alpha = estimateParamML(ES_min,ES_max,'zeta',-optimal_alpha,all_epochs(iTau).av_size_vec);
+        all_epochs(iTau).alpha = estimateParamML(param.ES.min,param.ES.max,'zeta',-param.optimal_alpha,all_epochs(iTau).av_size_vec);
         all_epochs(iTau).sigma = mean(all_epochs(iTau).sigma_vec);  
         % rate of events in each channel
         R(:,iTau) = sum(all_epochs(iTau).av_raster,2)/(size(all_epochs(iTau).av_raster,2)/EEG.srate); 
     end
     
-    [~,tau_optimal_inx] = min(sqrt(([all_epochs.sigma] - optimal_sigma).^2 + (-[all_epochs.alpha] - optimal_alpha).^2));
+    [~,tau_optimal_inx] = min(sqrt(([all_epochs.sigma] - param.optimal_sigma).^2 + (-[all_epochs.alpha] - param.optimal_alpha).^2));
     
     %save results
-    save([fp files{iFile}(1:end-4) '_avalanches.mat'],'all_epochs','param','tau_optimal_inx');
+    save([fp files{iFile}(1:end-4) '_avalanches.mat'],'all_epochs','param','file_info');
     
     %plot
-    xx = 1:300; yy = xx.^(optimal_alpha); 
+    xx = 1:300; yy = xx.^(param.optimal_alpha); 
     xSize = 7; ySize = 9.5; xLeft = (8.5 - xSize)/2; yTop = (11 - ySize)/2;%Graphic parameters
     for iTau = 1:length(param.tau_vec)
         
@@ -139,7 +156,7 @@ for iFile = 1:length(files)
         subplot(2,3,5); stem(R(:,iTau));xlabel('Channel #');ylabel('Events/sec');title('Event rate in each channel');set(gca,'XLim',[1 size(all_epochs(iTau).av_raster,1)]);
         
         % calculate avalanche distribution
-        [size_dist, ES_edges1] = NormalizedDist(all_epochs(iTau).av_size_vec,ES_edges); 
+        [size_dist, ES_edges1] = NormalizedDist(all_epochs(iTau).av_size_vec,param.ES.edges); 
         subplot(2,3,6); loglog(ES_edges1,size_dist,'LineWidth',2); hold on; loglog(xx,yy,'k--','LineWidth',3); hold off;
         set(gca,'XLim',[0 310]);
         xlabel('S');ylabel('P(S)');
@@ -151,8 +168,8 @@ for iFile = 1:length(files)
     hold on
     scatter([all_epochs(tau_optimal_inx).sigma],-[all_epochs(tau_optimal_inx).alpha],'dk','filled');
     text([all_epochs.sigma]+0.01,-[all_epochs.alpha],strsplit(num2str(param.tau_vec)));
-    plot([min(optimal_sigma,min([all_epochs.sigma]))-0.1, max(optimal_sigma,max([all_epochs.sigma]))+0.1],[optimal_alpha,optimal_alpha],'--m',...
-        [optimal_sigma,optimal_sigma],[min(optimal_alpha,min(-[all_epochs.alpha]))-0.1, max(optimal_alpha,max(-[all_epochs.alpha]))+0.1],'--m');
+    plot([min(param.optimal_sigma,min([all_epochs.sigma]))-0.1, max(param.optimal_sigma,max([all_epochs.sigma]))+0.1],[param.optimal_alpha,param.optimal_alpha],'--m',...
+        [param.optimal_sigma,param.optimal_sigma],[min(param.optimal_alpha,min(-[all_epochs.alpha]))-0.1, max(param.optimal_alpha,max(-[all_epochs.alpha]))+0.1],'--m');
     hold off
     
     
@@ -177,11 +194,11 @@ for iFile = 1:length(files)
 %             elc_av_size_vec = [elc_av_size_vec AvalancheResults.av_size_vec];
 %             elc_sigma_vec = [elc_sigma_vec AvalancheResults.sigma_vec];
 %         end 
-%         elc_alpha = estimateParamML(ES_min,ES_max,'zeta',-optimal_alpha,elc_av_size_vec);
+%         elc_alpha = estimateParamML(param.ES.min,param.ES.max,'zeta',-param.optimal_alpha,elc_av_size_vec);
 %         elc_sigma = mean(elc_sigma_vec); 
 %         
 %         % calculate avalanche distribution
-%         [elc_size_dist(:,iElTopo), elc_ES_edges1(:,iElTopo)] = NormalizedDist(elc_av_size_vec,ES_edges); 
+%         [elc_size_dist(:,iElTopo), elc_ES_edges1(:,iElTopo)] = NormalizedDist(elc_av_size_vec,param.ES.edges); 
 %         
 %         figure;
 %         subplot(1,2,1);topoplot([],EEGtemp.chanlocs, 'style', 'blank',  'electrodes', 'numpoint', 'chaninfo', EEGtemp.chaninfo); title(description{iElTopo});
