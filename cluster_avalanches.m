@@ -19,6 +19,7 @@ end
 
 
 for iFile = 1:length(files)
+    tic
     AvalancheAnalysisData = load([fp files{iFile}]);
     
     for iTau = 1:length(AvalancheAnalysisData.SimilarityMat)
@@ -29,24 +30,36 @@ for iFile = 1:length(files)
         
         ClusteringData(iTau).ClustersFull = [];
         ClusteringData(iTau).ClustersLen = [];
-        ClusteringData(iTau).AffinityFull = [];
-        ClusteringData(iTau).AffinityLen = [];
+        ClusteringData(iTau).StatsFull = [];
+        ClusteringData(iTau).StatsLen = [];
         ClusteringData(iTau).tau = AvalancheAnalysisData.SimilarityMat(iTau).tau;
         
         fig_name = ['Full Matrix - \tau '  num2str(AvalancheAnalysisData.SimilarityMat(iTau).tau)   '  ' files{iFile}];
         ClusteringData(iTau).ClustersFull = similarity_mat_2_clusters(AvalancheAnalysisData.SimilarityMat(iTau).MatFull, fig_name ,1);
-        ClusteringData(iTau).AffinityFull = avalanche_affinity(ClusteringData(iTau).ClustersFull, AvalancheAnalysisData.SimilarityMat(iTau).Id, fig_name, 1);
+        ClusteringData(iTau).StatsFull = clusters_statistics(ClusteringData(iTau).ClustersFull, AvalancheAnalysisData.SimilarityMat(iTau).Id, fig_name, 1);
+        
+        concat_max_nof_clusters_Len = 0;
         for iLen = 1:length(AvalancheAnalysisData.SimilarityMat(iTau).MatLen)
             fig_name = ['Avalanche Length: ' num2str(iLen) ' \tau '  num2str(AvalancheAnalysisData.SimilarityMat(iTau).tau)   '  ' files{iFile}];
             ClusteringData(iTau).ClustersLen{iLen} = similarity_mat_2_clusters(AvalancheAnalysisData.SimilarityMat(iTau).MatLen{iLen}, fig_name, 1);
-            ClusteringData(iTau).AffinityLen{iLen} = avalanche_affinity(ClusteringData(iTau).ClustersLen{iLen}, AvalancheAnalysisData.SimilarityMat(iTau).IdLen{iLen}, fig_name, 1);
+            ClusteringData(iTau).StatsLen{iLen} = clusters_statistics(ClusteringData(iTau).ClustersLen{iLen}, AvalancheAnalysisData.SimilarityMat(iTau).IdLen{iLen}, fig_name, 0);
+            concat_max_nof_clusters_Len = max([concat_max_nof_clusters_Len; ClusteringData(iTau).ClustersLen{iLen}]);
         end
+        
+        concat_cluster_id_prefix_Len = 10^ceil(log10(concat_max_nof_clusters_Len));
+        concat_ClustersLen = [];
+        concat_IdLen = [];
+        for iLen = 1:length(AvalancheAnalysisData.SimilarityMat(iTau).MatLen)
+            concat_ClustersLen = [concat_ClustersLen;  (concat_cluster_id_prefix_Len*iLen)+ClusteringData(iTau).ClustersLen{iLen}];
+            concat_IdLen = [concat_IdLen  AvalancheAnalysisData.SimilarityMat(iTau).IdLen{iLen}];
+        end
+        fig_name = ['Concatinated Different Length - \tau '  num2str(AvalancheAnalysisData.SimilarityMat(iTau).tau)   '  ' files{iFile}];
+        ClusteringData(iTau).StatsConcatLen = clusters_statistics(concat_ClustersLen, concat_IdLen, fig_name, 1);
         
     end %for iTau
     
     save([fp files{iFile}(1:end-4) '_clusters.mat'],'ClusteringData');
-    
-    %plot pie chart of composing avalanches: per scenario per subject per condition per word
+    toc
 end
 
 % tau = 1;  av_len = 3;
@@ -146,52 +159,43 @@ else
 end
 
 
-function Affinity = avalanche_affinity(Clusters_vec, Id_vec, fig_name, plot_flg)
+function Stats = clusters_statistics(Clusters_vec, Id_vec, fig_name, plot_flg)
 
 subj_inxs = [8 9];
 
-Affinity = [];
-for iAch=1:length(Id_vec)
-    subj_idx = subj_inxs(isstrprop(Id_vec{iAch}(subj_inxs),'digit'));
-    Affinity{str2num(Id_vec{iAch}(4)),str2num(Id_vec{iAch}(subj_idx)),str2num(Id_vec{iAch}(13)),str2num(Id_vec{iAch}(17))} = [];
+nof_ach = length(Id_vec);
+
+Stats.CondIds = {};
+Stats.P_clst = [];
+Stats.P_cond = [];
+Stats.P_clstGINVcond = [];
+Stats.P_clondGINVclst = [];
+
+for iAch=1:nof_ach
+    if sum(strcmp(Stats.CondIds, Id_vec{iAch}(1:17))) == 0
+        Stats.CondIds = [Stats.CondIds {Id_vec{iAch}(1:17)}];
+    end
 end
 
-for iAch=1:length(Id_vec)
-    subj_idx = subj_inxs(isstrprop(Id_vec{iAch}(subj_inxs),'digit'));
-    Affinity{str2num(Id_vec{iAch}(4)),str2num(Id_vec{iAch}(subj_idx)),str2num(Id_vec{iAch}(13)),str2num(Id_vec{iAch}(17))} = ...
-        [Affinity{str2num(Id_vec{iAch}(4)),str2num(Id_vec{iAch}(subj_idx)),str2num(Id_vec{iAch}(13)),str2num(Id_vec{iAch}(17))}  Clusters_vec(iAch)];
+clstVScond = zeros(length(Stats.CondIds),max(Clusters_vec));
+for iAch=1:nof_ach
+    cond_idx = find(contains(Stats.CondIds, Id_vec{iAch}(1:17)));
+    clstVScond(cond_idx,Clusters_vec(iAch)) = clstVScond(cond_idx,Clusters_vec(iAch)) + 1;
 end
+
+Stats.P_clst = sum(clstVScond,1)/nof_ach;
+Stats.P_cond = sum(clstVScond,2)/nof_ach;
+Stats.P_clondGINVclst = clstVScond ./ sum(clstVScond,1);
+Stats.P_clstGINVcond = clstVScond ./ sum(clstVScond,2);
 
 if plot_flg
-    
-    plot_id = [];
-    for k = 1:size(Affinity,1)
-        for l = 1:size(Affinity,2)
-            for m = 1:size(Affinity,3)
-                for n = 1:size(Affinity,4)
-                    if ~isempty(Affinity{k,l,m,n})
-                        plot_id = [plot_id; [k,l,m,n]];
-                    end
-                end
-            end
+    figure('Name',fig_name);
+    for i=1:size(clstVScond,1)  
+        pie_labels = string(1:size(clstVScond,2));
+        if length(pie_labels) <= 1
+            pie_labels = {pie_labels};
         end
+        subplot(ceil(size(clstVScond,1)/2),2,i); pie(clstVScond(i,:),pie_labels);
+        title(Stats.CondIds(i));
     end
-    
-    if ~isempty(plot_id)
-        figure('Name',fig_name);
-        for i=1:size(plot_id,1)
-            uniqe_ach = unique(Affinity{plot_id(i,1),plot_id(i,2),plot_id(i,3),plot_id(i,4)});
-            avalanch_type_cnt = [];
-            for iAch=1:length(uniqe_ach)
-                avalanch_type_cnt(iAch) = sum(Affinity{plot_id(i,1),plot_id(i,2),plot_id(i,3),plot_id(i,4)} == uniqe_ach(iAch));
-            end
-            pie_labels = string(uniqe_ach);
-            if length(pie_labels) <= 1
-                pie_labels = {pie_labels};
-            end
-            subplot(ceil(size(plot_id,1)/2),2,i);pie(avalanch_type_cnt,pie_labels);
-            title(['scn: ' num2str(plot_id(i,1)) '  subj: ' num2str(plot_id(i,2)) '  cond: ' num2str(plot_id(i,3)) '  word: ' num2str(plot_id(i,4))]);
-        end
-    end
-    
 end
