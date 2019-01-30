@@ -17,7 +17,6 @@ if ~iscell(files) %in case only 1 file selected
     files = {files};
 end
 
-
 for iFile = 1:length(files)
     tic
     AvalancheAnalysisData = load([fp files{iFile}]);
@@ -30,31 +29,32 @@ for iFile = 1:length(files)
         
         ClusteringData(iTau).ClustersFull = [];
         ClusteringData(iTau).ClustersLen = [];
+        ClusteringData(iTau).ClustersConcatLen = [];        
         ClusteringData(iTau).StatsFull = [];
         ClusteringData(iTau).StatsLen = [];
+        ClusteringData(iTau).StatsConcatLen = [];
+        ClusteringData(iTau).IdLConcatLen = [];
         ClusteringData(iTau).tau = AvalancheAnalysisData.SimilarityMat(iTau).tau;
         
         fig_name = ['Full Matrix - \tau '  num2str(AvalancheAnalysisData.SimilarityMat(iTau).tau)   '  ' files{iFile}];
         ClusteringData(iTau).ClustersFull = similarity_mat_2_clusters(AvalancheAnalysisData.SimilarityMat(iTau).MatFull, fig_name ,1);
-        ClusteringData(iTau).StatsFull = clusters_statistics(ClusteringData(iTau).ClustersFull, AvalancheAnalysisData.SimilarityMat(iTau).Id, fig_name, 1);
+        ClusteringData(iTau).StatsFull = clusters_statistics(ClusteringData(iTau).ClustersFull, AvalancheAnalysisData.SimilarityMat(iTau).Id, AvalancheAnalysisData.MultiFileAchVecs, AvalancheAnalysisData.TestingSet(iTau), iTau, fig_name, 1);
         
         concat_max_nof_clusters_Len = 0;
         for iLen = 1:length(AvalancheAnalysisData.SimilarityMat(iTau).MatLen)
             fig_name = ['Avalanche Length: ' num2str(iLen) ' \tau '  num2str(AvalancheAnalysisData.SimilarityMat(iTau).tau)   '  ' files{iFile}];
             ClusteringData(iTau).ClustersLen{iLen} = similarity_mat_2_clusters(AvalancheAnalysisData.SimilarityMat(iTau).MatLen{iLen}, fig_name, 1);
-            ClusteringData(iTau).StatsLen{iLen} = clusters_statistics(ClusteringData(iTau).ClustersLen{iLen}, AvalancheAnalysisData.SimilarityMat(iTau).IdLen{iLen}, fig_name, 0);
+            ClusteringData(iTau).StatsLen{iLen} = clusters_statistics(ClusteringData(iTau).ClustersLen{iLen}, AvalancheAnalysisData.SimilarityMat(iTau).IdLen{iLen}, AvalancheAnalysisData.MultiFileAchVecs, AvalancheAnalysisData.TestingSet(iTau), iTau, fig_name, 0);
             concat_max_nof_clusters_Len = max([concat_max_nof_clusters_Len; ClusteringData(iTau).ClustersLen{iLen}]);
         end
         
         concat_cluster_id_prefix_Len = 10^ceil(log10(concat_max_nof_clusters_Len));
-        concat_ClustersLen = [];
-        concat_IdLen = [];
         for iLen = 1:length(AvalancheAnalysisData.SimilarityMat(iTau).MatLen)
-            concat_ClustersLen = [concat_ClustersLen;  (concat_cluster_id_prefix_Len*iLen)+ClusteringData(iTau).ClustersLen{iLen}];
-            concat_IdLen = [concat_IdLen  AvalancheAnalysisData.SimilarityMat(iTau).IdLen{iLen}];
+            ClusteringData(iTau).ClustersConcatLen = [ClusteringData(iTau).ClustersConcatLen;  (concat_cluster_id_prefix_Len*iLen)+ClusteringData(iTau).ClustersLen{iLen}];
+            ClusteringData(iTau).IdLConcatLen = [ClusteringData(iTau).IdLConcatLen  AvalancheAnalysisData.SimilarityMat(iTau).IdLen{iLen}];
         end
         fig_name = ['Concatinated Different Length - \tau '  num2str(AvalancheAnalysisData.SimilarityMat(iTau).tau)   '  ' files{iFile}];
-        ClusteringData(iTau).StatsConcatLen = clusters_statistics(concat_ClustersLen, concat_IdLen, fig_name, 1);
+        ClusteringData(iTau).StatsConcatLen = clusters_statistics(ClusteringData(iTau).ClustersConcatLen, ClusteringData(iTau).IdLConcatLen, AvalancheAnalysisData.MultiFileAchVecs, AvalancheAnalysisData.TestingSet(iTau), iTau, fig_name, 1);
         
     end %for iTau
     
@@ -74,6 +74,8 @@ function T_opt = similarity_mat_2_clusters(sim_M, fig_name, plot_flg)
 max_nof_clusters = Inf; % 15 Inf
 similarity_dist_threshold = 0.5; %for cases when there is same distance all over the matrix
 contrast_tolerance = 0.05; %allow contrast to be 5% (of dynamic range) less to nminimize nof clusters
+minimal_contrast = 0.7;
+%%%%%%%%%%%%%%%%%%%
 
 if numel(sim_M) == 0
     T_opt = [];
@@ -90,9 +92,9 @@ else
     clusters_distance = unique(cluster_tree(:,3));
     if length(clusters_distance) == 1
         if clusters_distance <= similarity_dist_threshold
-            T_opt = ones(N,1);
+            T_opt = ones(N,1); %single cluster
         else
-            T_opt = (1:N)';
+            T_opt = (1:N)'; %all separate clusters
         end
         return;
     end
@@ -110,9 +112,11 @@ else
         D_in = D_in/D_in_cnt;
         C = (D_in-D_out)/(D_in+D_out);
         
-        NofsClusters = [NofsClusters max(T)];
-        Cutoffs = [Cutoffs cutoff];
-        Contrasts = [Contrasts C];
+        if C >= minimal_contrast
+            NofsClusters = [NofsClusters max(T)];
+            Cutoffs = [Cutoffs cutoff];
+            Contrasts = [Contrasts C];
+        end
     end
     %     cutoff_opt = 0.9;
     %     T_opt = cluster(cluster_tree,'cutoff',cutoff_opt,'criterion','distance');
@@ -125,8 +129,15 @@ else
         [NofsClusters, sort_inces] = sort(NofsClusters);
         opt_inx = find(Contrasts(sort_inces) > max(Contrasts) - (max(Contrasts)-min(Contrasts))*contrast_tolerance, 1);
         opt_inx = min(opt_inx, find(NofsClusters <= max_nof_clusters, 1, 'last'));
-    else
+    elseif length(NofsClusters) == 1
         sort_inces = 1; opt_inx = 1;
+    else %clustering failed due to low contrast
+        if max(clusters_distance) <= similarity_dist_threshold
+            T_opt = ones(N,1); %single cluster
+        else
+            T_opt = (1:N)'; %all separate clusters
+        end
+        return;
     end
     
     %     NofsClusters(opt_inx)
@@ -136,14 +147,14 @@ else
     
     if plot_flg
         figure('Name',fig_name);
-        subplot(1,3,1);imagesc(sim_M);title('original');
+        subplot(1,3,1);imagesc(sim_M);title('original');colorbar;
         subplot(1,3,2);[~,T_dend,perm_dend] = dendrogram(cluster_tree, NofsClusters(opt_inx), 'ColorThreshold',Cutoffs(sort_inces(opt_inx)), 'Orientation','left');
         title(['cutoff distance = ' num2str(Cutoffs(sort_inces(opt_inx))) '  contrast = ' num2str(Contrasts(sort_inces(opt_inx))) '  nof clusters = ' num2str(NofsClusters(opt_inx))]);
         T_perm = [];
         for iClust = perm_dend
             T_perm = [T_perm; find(T_dend==iClust)];
         end
-        subplot(1,3,3);imagesc(sim_M(T_perm,T_perm));title('clustered');
+        subplot(1,3,3);imagesc(sim_M(T_perm,T_perm));title('clustered');colorbar;
         
         %     mtd = 'average';  %'average' 'weighted'
         %     cluster_tree = linkage(dist_v,mtd);
@@ -155,47 +166,5 @@ else
         %     dendrogram(cluster_tree,dendogram_leafs_num, 'ColorThreshold',cutoff, 'Reorder',leafOrder, 'CheckCrossing',true); title(['method - ' mtd]);
         
         %             figure;plot(NofsClusters,Contrasts(sort_inces), NofsClusters(opt_inx),Contrasts(sort_inces(opt_inx)),'xk');
-    end
-end
-
-
-function Stats = clusters_statistics(Clusters_vec, Id_vec, fig_name, plot_flg)
-
-subj_inxs = [8 9];
-
-nof_ach = length(Id_vec);
-
-Stats.CondIds = {};
-Stats.P_clst = [];
-Stats.P_cond = [];
-Stats.P_clstGINVcond = [];
-Stats.P_clondGINVclst = [];
-
-for iAch=1:nof_ach
-    if sum(strcmp(Stats.CondIds, Id_vec{iAch}(1:17))) == 0
-        Stats.CondIds = [Stats.CondIds {Id_vec{iAch}(1:17)}];
-    end
-end
-
-clstVScond = zeros(length(Stats.CondIds),max(Clusters_vec));
-for iAch=1:nof_ach
-    cond_idx = find(contains(Stats.CondIds, Id_vec{iAch}(1:17)));
-    clstVScond(cond_idx,Clusters_vec(iAch)) = clstVScond(cond_idx,Clusters_vec(iAch)) + 1;
-end
-
-Stats.P_clst = sum(clstVScond,1)/nof_ach;
-Stats.P_cond = sum(clstVScond,2)/nof_ach;
-Stats.P_clondGINVclst = clstVScond ./ sum(clstVScond,1);
-Stats.P_clstGINVcond = clstVScond ./ sum(clstVScond,2);
-
-if plot_flg
-    figure('Name',fig_name);
-    for i=1:size(clstVScond,1)  
-        pie_labels = string(1:size(clstVScond,2));
-        if length(pie_labels) <= 1
-            pie_labels = {pie_labels};
-        end
-        subplot(ceil(size(clstVScond,1)/2),2,i); pie(clstVScond(i,:),pie_labels);
-        title(Stats.CondIds(i));
     end
 end
