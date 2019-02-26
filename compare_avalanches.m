@@ -9,18 +9,12 @@ close all
 
 fp = 'D:\My Files\Work\BGU\datasets\Panas\';
 
-%the raster matrix is not necessary binary. it counts events per bin, so it's values can be >1. it can also contain amplitudes
-%for now, make it binary (OTHER OPTIONS NEVER TESTED OR DEBUGED)
-raster_input_type = 'binary'; % 'binary' 'events_cnt' 'amplitude' -> set to appear in folder name as well
-
-similarity_method = 'jaccard'; % 'jaccard' 'correlation' 'levenshtein'  -> set to appear in folder name as well
-
 %consider 60 or 64 electrodes vector
 convert60to64channels_flg = 0;
 
 taus_to_use = 'optimal_multi_files'; %'all' 'optimal_per_file' 'optimal_multi_files'
 
-test_set_percent = 0.1;
+params_t = global_params();
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -93,7 +87,7 @@ for iFile = 1:length(files)
         end
         AvalancheVectors(iTau).file_id = file_id;
         for iEpoch = 1:size(AvalancheData.all_epochs(iTau).av_raster_epochs,3)
-            AvalancheVectors(iTau).epochs_vecs{iEpoch} = raster2vectors(AvalancheData.all_epochs(iTau).av_raster_epochs(:,:,iEpoch), raster_input_type, convert60to64channels_flg);
+            AvalancheVectors(iTau).epochs_vecs{iEpoch} = raster2vectors(AvalancheData.all_epochs(iTau).av_raster_epochs(:,:,iEpoch), params_t.raster_input_type, convert60to64channels_flg);
             if ~isempty(AvalancheVectors(iTau).epochs_vecs{iEpoch})
                 avch_length_bins = [AvalancheVectors(iTau).epochs_vecs{iEpoch}.length_bins];
                 for iAvalanche=1:length(avch_length_bins)
@@ -120,7 +114,7 @@ for iFile = 1:length(files)
 %         SimilarityMat(iTau).is_optimal_tau = AvalancheVectors(iTau).is_optimal_tau;
 %         SimilarityMat(iTau).Id = AvalancheVectors(iTau).Id;
 %         SimilarityMat(iTau).IdLen = AvalancheVectors(iTau).IdLen;
-%         SimilarityMat = calc_similarity_mat(SimilarityMat, MultiFileAchVecs, iTau, similarity_method);
+%         SimilarityMat = calc_similarity_mat(SimilarityMat, MultiFileAchVecs, iTau, params_t.similarity_method);
                 
 %         toc
     end %for iTau
@@ -164,7 +158,7 @@ for iTau = tau_idxs
     end
     
     for cond_idx=1:length(TestingSet(iTau).CondIds)
-        test_epochs_inx = randperm(length(ConditionsEpochIds{cond_idx}), round(length(ConditionsEpochIds{cond_idx})*test_set_percent));
+        test_epochs_inx = randperm(length(ConditionsEpochIds{cond_idx}), round(length(ConditionsEpochIds{cond_idx})*params_t.test_set_percent));
         TestingSet(iTau).EpochIds{cond_idx} = ConditionsEpochIds{cond_idx}(test_epochs_inx);
         test_ach_inx = contains(ConditionsAchIds{cond_idx},TestingSet(iTau).EpochIds{cond_idx});
         TestingSet(iTau).AchIds{cond_idx} = ConditionsAchIds{cond_idx}(test_ach_inx);
@@ -196,7 +190,7 @@ for iTau = tau_idxs
             end
         end
     end
-    SimilarityMat = calc_similarity_mat(SimilarityMat, MultiFileAchVecs, iTau, similarity_method);
+    SimilarityMat = calc_similarity_mat(SimilarityMat, MultiFileAchVecs, iTau, params_t.similarity_method);
 
 toc
 end %for iTau
