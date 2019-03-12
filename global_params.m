@@ -11,3 +11,4 @@ params_t.test_set_percent = 0.1;
 
 params_t.minimal_similarity_threshold = 0.5;
 params_t.condition_descision_threshold = 0.5;
+params_t.accum_sample_limit = 10; %max nof avalanches in accumulator for SampLimitAccum mode
