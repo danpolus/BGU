@@ -1,0 +1,104 @@
+%
+%Step 5
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function get_testing_clusters()
+
+clear all
+close all
+
+fp = 'D:\My Files\Work\BGU\datasets\Panas\';
+
+params_t = global_params();
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+[files, fp] = uigetfile([fp '*.mat'], 'Select clustering results files','MultiSelect','on');
+if ~iscell(files) %in case only 1 file selected
+    files = {files};
+end
+
+for iFile = 1:length(files)
+    load([fp files{iFile}],'ClusteringData');
+    load([fp [files{iFile}(1:end-13) '.mat']],'MultiFileAchVecs','SimilarityMat','TestingSet');
+    
+    tic
+    
+    TestingSetClusters = [];
+    for iTau = 1:length(ClusteringData)
+        if isempty(ClusteringData(iTau).tau)
+            continue;
+        end
+           
+        TestingSetClusters(iTau).tau = TestingSet(iTau).tau;
+        TestingSetClusters(iTau).is_optimal_tau = TestingSet(iTau).is_optimal_tau;
+        TestingSetClusters(iTau).CondIds = TestingSet(iTau).CondIds;
+        
+        for iMode = 1:length(params_t.compare_modes)
+            for iCond = 1:length(TestingSet(iTau).CondIds)
+                %test epochs vectors
+                for iEpoch = 1:length(TestingSet(iTau).EpochIds{iCond})
+                    %fln = str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(4:6));
+                    %epc = str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(10:12));
+                    ach_vectors_t = MultiFileAchVecs{str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(4:6))}(iTau).epochs_vecs{str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(10:12))};
+                    
+                    for iVec = 1:length(ach_vectors_t)
+                        avch_length_bins = length(ach_vectors_t(iVec).vec)/MultiFileAchVecs{1}(iTau).nof_channels;
+                        [cluster_num, cluster_sim] = find_vector_cluster(ach_vectors_t(iVec).vec, avch_length_bins, MultiFileAchVecs, SimilarityMat, ClusteringData, params_t.similarity_method, params_t.compare_modes{iMode}, iTau);
+                        TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_num(iVec) = cluster_num;
+                        TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_sim(iVec) = cluster_sim;
+                        TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).avch_length_bins(iVec) = avch_length_bins;
+                    end
+                end
+            end
+        end
+    end
+    
+    toc
+    
+    save([fp files{iFile}(1:end-4) '_testclust.mat'],'TestingSetClusters','ClusteringData');
+end
+
+                        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [cluster_num, cluster_sim] = find_vector_cluster(v, avch_length_bins, MultiFileAchVecs, SimilarityMat, ClusteringData, similarity_method, compare_mode, iTau)
+
+switch compare_mode
+    case 'Full'
+        clusters_v = ClusteringData(iTau).ClustersFull;
+        Id_list = SimilarityMat(iTau).Id;
+    case 'Len'
+        clusters_v = ClusteringData(iTau).ClustersLen{avch_length_bins};
+        Id_list = SimilarityMat(iTau).IdLen{avch_length_bins};
+    case 'ConcatLen'
+        clusters_v = ClusteringData(iTau).ClustersConcatLen;
+        Id_list = ClusteringData(iTau).IdLConcatLen;
+end
+
+clusters = unique(clusters_v);
+clusters_similarity = zeros(1,length(clusters));
+for iClust = 1:length(clusters)
+    ClusterAchIds = Id_list(clusters(iClust) == clusters_v);
+    if strcmp(compare_mode, 'ConcatLen')
+        v_compare = MultiFileAchVecs{str2num(ClusterAchIds{1}(21:23))}(iTau).epochs_vecs{str2num(ClusterAchIds{1}(27:29))}(str2num(ClusterAchIds{1}(33:36))).vec;
+        if  avch_length_bins ~= length(v_compare)/MultiFileAchVecs{1}(iTau).nof_channels
+            continue;
+        end
+    end
+    for iAch = 1:length(ClusterAchIds)
+        %fln = str2num(ClusterAchIds{iAch}(21:23));
+        %epc = str2num(ClusterAchIds{iAch}(27:29));
+        %ach = str2num(ClusterAchIds{iAch}(33:36));
+        v_compare = MultiFileAchVecs{str2num(ClusterAchIds{iAch}(21:23))}(iTau).epochs_vecs{str2num(ClusterAchIds{iAch}(27:29))}(str2num(ClusterAchIds{iAch}(33:36))).vec;
+        if strcmp(compare_mode, 'Full')
+            %clusters_similarity(iClust) = clusters_similarity(iClust) + calc_sliding_similarity(v, v_compare, MultiFileAchVecs{1}(iTau).nof_channels, similarity_method); %average
+            clusters_similarity(iClust) = max(clusters_similarity(iClust), calc_sliding_similarity(v, v_compare, MultiFileAchVecs{1}(iTau).nof_channels, similarity_method)); %nearest neighbour
+        else
+            %clusters_similarity(iClust) = clusters_similarity(iClust) + calc_vectors_similarity(v, v_compare, similarity_method); %average
+            clusters_similarity(iClust) = max(clusters_similarity(iClust), calc_vectors_similarity(v, v_compare, similarity_method)); %nearest neighbour
+        end
+    end
+    %clusters_similarity(iClust) = clusters_similarity(iClust)/length(ClusterAchIds); %average
+end
+[cluster_sim,max_inx] = max(clusters_similarity);
+cluster_num = clusters(max_inx);

@@ -12,11 +12,12 @@ Stats.P_clst = [];
 Stats.P_clstGINVcond = [];
 Stats.P_clondGINVclst = [];
 
-for iFile = 1:length(MultiFileAchVecs)
-    cond_idx = find(contains(Stats.CondIds, MultiFileAchVecs{iFile}(iTau).file_id(1:17)));
-    Stats.P_cond(cond_idx) = Stats.P_cond(cond_idx) + length(MultiFileAchVecs{iFile}(iTau).epochs_vecs) - length(TestingSet.EpochIds{cond_idx});
-end
-Stats.P_cond = Stats.P_cond/sum(Stats.P_cond);
+% %epoch based
+% for iFile = 1:length(MultiFileAchVecs)
+%     cond_idx = find(contains(Stats.CondIds, MultiFileAchVecs{iFile}(iTau).file_id(1:17)));
+%     Stats.P_cond(cond_idx) = Stats.P_cond(cond_idx) + length(MultiFileAchVecs{iFile}(iTau).epochs_vecs) - length(TestingSet.EpochIds{cond_idx});
+% end
+% Stats.P_cond = Stats.P_cond/sum(Stats.P_cond);
 
 clstVScond = zeros(length(Stats.CondIds),max(Clusters_vec));
 for iAch=1:nof_ach
@@ -24,6 +25,8 @@ for iAch=1:nof_ach
     clstVScond(cond_idx,Clusters_vec(iAch)) = clstVScond(cond_idx,Clusters_vec(iAch)) + 1;
 end
 
+% Stats.P_cond = sum(clstVScond,2)'/nof_ach; %avalanche based
+Stats.P_cond = ones(1,length(MultiFileAchVecs))/length(MultiFileAchVecs); %uniform
 Stats.P_clst = sum(clstVScond,1)/nof_ach;
 Stats.P_clondGINVclst = clstVScond ./ sum(clstVScond,1);
 Stats.P_clstGINVcond = clstVScond ./ sum(clstVScond,2);
