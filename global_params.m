@@ -20,5 +20,9 @@ switch params_t.similarity_method
     case 'levenshtein'
         params_t.minimal_similarity_threshold = 0.5;
 end
-params_t.condition_descision_threshold = 5; %threshold for accumulative predictor to decide
-params_t.accum_sample_limit = 10; %max nof avalanches in accumulator for SampLimitAccum mode
+params_t.condition_descision_static_threshold = -1:0.25:4; %ROC: threshold for accumulative predictor to decide
+params_t.condition_descision_step_av_threshold = 2;
+params_t.condition_descision_step_std_threshold = 2;
+params_t.condition_descision_contrast_threshold = 0.75;
+params_t.max_cnt = 20; %for collapsing threshold. limit nof avalanches in descision
+params_t.condition_descision_static_counter_limit = 1:params_t.max_cnt; %ROC: max nof avalanches in accumulator for SampLimitAccum mode
