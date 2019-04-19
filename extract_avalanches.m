@@ -31,32 +31,36 @@ param.tau_vec = 1/EEG.srate:1/EEG.srate:max_tau_sec; % array with delta t values
 param.optimal_alpha = -1.5;
 param.optimal_sigma = 1;
 
-std_TH = 3.0; %set ZsubjTh3 to appears in folder name
+std_TH = 3.0; %set ZsubjTh3 to appears in folder name. try 3.5?
 % Zfile means that mean and std calculated per file
 % Zsubj means that mean and std calculated over all subject files for the same scenario
 
 zero_bad_epoch_channels_flg = true; %true -> BEfile_BC####, false ->BEnone_BCnone set to appear in folder name
 zero_bad_chanels_flg = true ;% false -> BCnone set to appear in folder name
 zero_subj_scenario_bad_channels_flg = false; %true -> BCsubj, false -> BCfile set to appear in folder name
+zscore_mode = 'file'; % epoch file scenario
 
 %%%%%%%%%%%%%%%%%%%%
 
-%calculate mean and std of the whole scenario for each channel
-EEG_data_reshaped = [];
 subj_scenario_bad_channels = [];
-for iFile = 1:length(files)
-    EEG = pop_loadset([fp files{iFile}]);
-    bad_epoch_chan = EEG.reject_hstr.rejglobalE(:,~EEG.reject_hstr.rejmanual);
-    for iEpoch=1:EEG.trials
-        EEG.data(bad_epoch_chan(:,iEpoch),:,iEpoch) = NaN; %set bad epoch channels to NaN
+
+%calculate mean and std of the whole scenario for each channel
+if strcmp(zscore_mode, 'scenario')
+    EEG_data_reshaped = [];
+    for iFile = 1:length(files)
+        EEG = pop_loadset([fp files{iFile}]);
+        bad_epoch_chan = EEG.reject_hstr.rejglobalE(:,~EEG.reject_hstr.rejmanual);
+        for iEpoch=1:EEG.trials
+            EEG.data(bad_epoch_chan(:,iEpoch),:,iEpoch) = NaN; %set bad epoch channels to NaN
+        end
+        EEG_data_reshaped = [EEG_data_reshaped reshape(EEG.data,size(EEG.data,1),[])];
+        subj_scenario_bad_channels = [subj_scenario_bad_channels EEG.bad_channels];
     end
-    EEG_data_reshaped = [EEG_data_reshaped reshape(EEG.data,size(EEG.data,1),[])];
-    subj_scenario_bad_channels = [subj_scenario_bad_channels EEG.bad_channels];
+    subj_mean = mean(EEG_data_reshaped,2,'omitnan');
+    subj_std = std(EEG_data_reshaped,[],2,'omitnan');
+    subj_scenario_bad_channels = unique(subj_scenario_bad_channels);
+    clear('EEG_data_reshaped');
 end
-subj_scenario_mean = mean(EEG_data_reshaped,2,'omitnan');
-subj_scenario_std = std(EEG_data_reshaped,[],2,'omitnan');
-subj_scenario_bad_channels = unique(subj_scenario_bad_channels);
-clear('EEG_data_reshaped');
 
 for iFile = 1:length(files)
     
@@ -82,10 +86,20 @@ for iFile = 1:length(files)
     EEG = pop_loadset([fp files{iFile}]);
     
     %zscore
-    subj_scenario_mean_mat = repmat(subj_scenario_mean,[1,size(EEG.data,2),size(EEG.data,3)]);
-    subj_scenario_std_mat = repmat(subj_scenario_std,[1,size(EEG.data,2),size(EEG.data,3)]);
-    EEG.data = (EEG.data - subj_scenario_mean_mat)./ subj_scenario_std_mat;
-    EEG.data(isinf(EEG.data)) = 0;
+    if strcmp(zscore_mode, 'file')
+        subj_mean = mean(reshape(EEG.data,size(EEG.data,1),[]),2,'omitnan');
+        subj_std = std(reshape(EEG.data,size(EEG.data,1),[]),[],2,'omitnan');   
+    end    
+    if strcmp(zscore_mode, 'scenario') || strcmp(zscore_mode, 'file')
+        %EEG.data = zscore(EEG.data,0,[2 3]); %for file: should work in matlab 2019
+        subj_mean_mat = repmat(subj_mean,[1,size(EEG.data,2),size(EEG.data,3)]);
+        subj_std_mat = repmat(subj_std,[1,size(EEG.data,2),size(EEG.data,3)]);         
+        EEG.data = (EEG.data - subj_mean_mat)./ subj_std_mat;    
+    end
+    if strcmp(zscore_mode, 'epoch') 
+        EEG.data = zscore(EEG.data,0,2);
+    end
+    EEG.data(isinf(EEG.data) | isnan(EEG.data)) = 0;
     
     %set bad data to 0
     if zero_bad_epoch_channels_flg
@@ -100,6 +114,13 @@ for iFile = 1:length(files)
             EEG.data(bad_epoch_chan(:,iEpoch),:,iEpoch) = 0; %set bad epoch channels to 0
         end
     end
+    
+    %plot
+    EEG_plot = pop_eegthresh(EEG, 1, 1:EEG.nbchan, -std_TH, std_TH, EEG.xmin, EEG.xmax, 0, 0);
+    EEG_plot = eeg_rejsuperpose(EEG_plot, 1, 1, 1, 1, 1, 1, 1, 1);
+    EEG_plot.reject.rejmanual = EEG_plot.reject.rejglobal;
+    EEG_plot.reject.rejmanualE = EEG_plot.reject.rejglobalE;
+    pop_eegplot(EEG_plot, 1, 0, 0, [], 'srate',EEG_plot.srate, 'winlength',10, 'spacing', 5, 'eloc_file', []);
     
     %initialize results vector
     for iTau = 1:length(param.tau_vec)

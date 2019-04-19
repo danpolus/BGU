@@ -1,5 +1,5 @@
 %
-%Step 6
+%Step 7
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function predict_conditions()
@@ -15,31 +15,42 @@ accumulator_types = {'TotalAccum', 'ThreshAccum', 'EpochAccum', 'SampLimitAccum'
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-[files, fp] = uigetfile([fp '*.mat'], 'Select testing clusters files','MultiSelect','on');
-if ~iscell(files) %in case only 1 file selected
-    files = {files};
-end
+[fn, fp] = uigetfile([fp '*.mat'], 'Select testing clusters file');
 
-for iFile = 1:length(files)
-    load([fp files{iFile}],'TestingSetClusters','ClusteringData');
-    
-    PredictionResults = [];
-    
-    for iTau = 1:length(TestingSetClusters)
-        if isempty(TestingSetClusters(iTau).tau)
-            continue;
-        end
-        
-        PredictionResults(iTau).tau = TestingSetClusters(iTau).tau;
-        PredictionResults(iTau).is_optimal_tau = TestingSetClusters(iTau).is_optimal_tau;
-        PredictionResults(iTau).CondIds = TestingSetClusters(iTau).CondIds;
-        nof_cond = length(TestingSetClusters(iTau).CondIds);
-        
-        for iMode = 1:length(params_t.compare_modes)
-            for iCond = 1:nof_cond
-                
-                %init
-                if ~strcmp(params_t.compare_modes{iMode}, 'Len')
+load([fp fn],'TestingSetClusters','ClusteringData');
+
+PredictionResults = [];
+
+for iTau = 1:length(TestingSetClusters)
+    if isempty(TestingSetClusters(iTau).tau)
+        continue;
+    end
+
+    PredictionResults(iTau).tau = TestingSetClusters(iTau).tau;
+    PredictionResults(iTau).is_optimal_tau = TestingSetClusters(iTau).is_optimal_tau;
+    PredictionResults(iTau).CondIds = TestingSetClusters(iTau).CondIds;
+    nof_cond = length(TestingSetClusters(iTau).CondIds);
+
+    for iMode = 1:length(params_t.compare_modes)
+        for iCond = 1:nof_cond
+
+            %init
+            if ~strcmp(params_t.compare_modes{iMode}, 'Len')
+                for iAccum = 1:length(accumulator_types)
+                    switch accumulator_types{iAccum}
+                        case 'ThreshAccum'
+                            nof_ths = length(params_t.condition_descision_threshold);
+                        case 'SampLimitAccum'
+                            nof_ths = length(params_t.condition_counter_limit);
+                        otherwise
+                            nof_ths = 1;
+                    end
+                    for iThs = 1:nof_ths
+                        PredictionResults(iTau).(params_t.compare_modes{iMode}).(accumulator_types{iAccum})(iCond,iThs) = predictor_init_next(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]), []);
+                    end
+                end
+            else
+                for iLen = 1:length(ClusteringData(iTau).ClustersLen)
                     for iAccum = 1:length(accumulator_types)
                         switch accumulator_types{iAccum}
                             case 'ThreshAccum'
@@ -50,125 +61,111 @@ for iFile = 1:length(files)
                                 nof_ths = 1;
                         end
                         for iThs = 1:nof_ths
-                            PredictionResults(iTau).(params_t.compare_modes{iMode}).(accumulator_types{iAccum})(iCond,iThs) = predictor_init_next(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]), []);
+                            PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.(accumulator_types{iAccum})(iCond,iThs) =  predictor_init_next(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]){iLen}, []);
                         end
-                    end
-                else
-                    for iLen = 1:length(ClusteringData(iTau).ClustersLen)
-                        for iAccum = 1:length(accumulator_types)
-                            switch accumulator_types{iAccum}
-                                case 'ThreshAccum'
-                                    nof_ths = length(params_t.condition_descision_threshold);
-                                case 'SampLimitAccum'
-                                    nof_ths = length(params_t.condition_counter_limit);
-                                otherwise
-                                    nof_ths = 1;
-                            end
-                            for iThs = 1:nof_ths
-                                PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.(accumulator_types{iAccum})(iCond,iThs) =  predictor_init_next(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]){iLen}, []);
-                            end
-                        end
-                    end
-                end
-                
-                %test epochs clusters
-                for iEpoch = 1:length(TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst)
-                    for iVec = 1:length(TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_num)
-                        avch_length_bins = TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).avch_length_bins(iVec);
-                        max_cnt = length(TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_num); %params_t.max_cnt
-                        
-                        if TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_sim(iVec) >= params_t.minimal_similarity_threshold
-                            if ~strcmp(params_t.compare_modes{iMode}, 'Len')
-                                for iAccum = 1:length(accumulator_types)
-                                    cond_predictors = PredictionResults(iTau).(params_t.compare_modes{iMode}).(accumulator_types{iAccum});
-                                    for iThs = 1:size(cond_predictors,2)
-                                        cond_predictors(iCond,iThs) = predictor_accumulate(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]), TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_num(iVec),...
-                                            TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_sim(iVec), cond_predictors(iCond,iThs));
-                                        %next ThreshAccum, SampLimitAccum
-                                        if strcmp(accumulator_types{iAccum},'ThreshAccum')
-                                            cond_predictors(iCond,iThs) = predictor_threshold_decide(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]), cond_predictors(iCond,iThs), params_t.condition_descision_threshold(iThs), max_cnt);
-                                        end
-                                        if strcmp(accumulator_types{iAccum},'SampLimitAccum')
-                                            cond_predictors(iCond,iThs) = predictor_counter_decide(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]), cond_predictors(iCond,iThs), params_t.condition_counter_limit(iThs));
-                                        end
-                                    end
-                                    PredictionResults(iTau).(params_t.compare_modes{iMode}).(accumulator_types{iAccum}) = cond_predictors;
-                                end
-                            else
-                                for iAccum = 1:length(accumulator_types)
-                                    cond_predictors = PredictionResults(iTau).(params_t.compare_modes{iMode}){avch_length_bins}.(accumulator_types{iAccum});
-                                    for iThs = 1:size(cond_predictors,2)
-                                        cond_predictors(iCond,iThs) = predictor_accumulate(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]){avch_length_bins}, TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_num(iVec),...
-                                            TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_sim(iVec), cond_predictors(iCond,iThs));
-                                        %next ThreshAccum, SampLimitAccum
-                                        if strcmp(accumulator_types{iAccum},'ThreshAccum')
-                                            cond_predictors(iCond,iThs) = predictor_threshold_decide(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]){avch_length_bins}, cond_predictors(iCond,iThs), params_t.condition_descision_threshold(iThs), max_cnt);
-                                        end
-                                        if strcmp(accumulator_types{iAccum},'SampLimitAccum')
-                                            cond_predictors(iCond,iThs) = predictor_counter_decide(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]){avch_length_bins}, cond_predictors(iCond,iThs), params_t.condition_counter_limit(iThs));
-                                        end
-                                    end
-                                    PredictionResults(iTau).(params_t.compare_modes{iMode}){avch_length_bins}.(accumulator_types{iAccum}) = cond_predictors;
-                                end
-                            end
-                        end
-                    end %for iVec
-                    
-                    %next EpochAccum
-                    if ~strcmp(params_t.compare_modes{iMode}, 'Len')
-                        PredictionResults(iTau).(params_t.compare_modes{iMode}).EpochAccum(iCond,1) = predictor_decide_last(PredictionResults(iTau).(params_t.compare_modes{iMode}).EpochAccum(iCond,1));
-                        if iEpoch < length(TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst)
-                            PredictionResults(iTau).(params_t.compare_modes{iMode}).EpochAccum(iCond,1) = predictor_init_next(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]), PredictionResults(iTau).(params_t.compare_modes{iMode}).EpochAccum(iCond,1));
-                        end
-                    else
-                        for iLen = 1:length(ClusteringData(iTau).ClustersLen)
-                            PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.EpochAccum(iCond,1) = predictor_decide_last(PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.EpochAccum(iCond,1));
-                            if iEpoch < length(TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst)
-                                PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.EpochAccum(iCond,1) = predictor_init_next(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]){iLen}, PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.EpochAccum(iCond,1));
-                            end
-                        end
-                    end
-                    
-                end %for iEpoch
-                
-                %decide TotalAccum
-                if ~strcmp(params_t.compare_modes{iMode}, 'Len')
-                    PredictionResults(iTau).(params_t.compare_modes{iMode}).TotalAccum(iCond,1) = predictor_decide_last(PredictionResults(iTau).(params_t.compare_modes{iMode}).TotalAccum(iCond,1));
-                else
-                    for iLen = 1:length(ClusteringData(iTau).ClustersLen)
-                        PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.TotalAccum(iCond,1) = predictor_decide_last(PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.TotalAccum(iCond,1));
-                    end
-                end
-                
-            end %for iCond
-        end %for iMode
-        
-        %ROC & display
-        for iMode = 1:length(params_t.compare_modes)
-            if ~strcmp(params_t.compare_modes{iMode}, 'Len')
-                for iAccum = 1:length(accumulator_types)
-                    PredictionResults(iTau).(params_t.compare_modes{iMode}).(accumulator_types{iAccum}) = calc_predictor_performance(PredictionResults(iTau).(params_t.compare_modes{iMode}).(accumulator_types{iAccum}),...
-                        ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]));
-                    disp_str = ['Mode: ' params_t.compare_modes{iMode} ', ' accumulator_types{iAccum}];
-                    diplay_predictor_results(PredictionResults(iTau).(params_t.compare_modes{iMode}).(accumulator_types{iAccum}), PredictionResults(iTau).CondIds, params_t,disp_str);
-                end
-            else
-                for iLen = 1:length(ClusteringData(iTau).ClustersLen)
-                    for iAccum = 1:length(accumulator_types)
-                        PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.(accumulator_types{iAccum}) = calc_predictor_performance(PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.(accumulator_types{iAccum}),...
-                            ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]){iLen});
-                        %disp_str = ['Mode: ' params_t.compare_modes{iMode} ', ' accumulator_types{iAccum} 'Avalanche Length: ' num2str(iLen,'%d')];
-                        %diplay_predictor_results(PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.(accumulator_types{iAccum}), PredictionResults(iTau).CondIds, params_t, disp_str);
                     end
                 end
             end
+
+            %test epochs clusters
+            for iEpoch = 1:length(TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst)
+                for iVec = 1:length(TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_num)
+                    avch_length_bins = TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).avch_length_bins(iVec);
+                    max_cnt = length(TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_num); %params_t.max_cnt
+
+                    if TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_sim(iVec) >= params_t.minimal_similarity_threshold
+                        if ~strcmp(params_t.compare_modes{iMode}, 'Len')
+                            for iAccum = 1:length(accumulator_types)
+                                cond_predictors = PredictionResults(iTau).(params_t.compare_modes{iMode}).(accumulator_types{iAccum});
+                                for iThs = 1:size(cond_predictors,2)
+                                    cond_predictors(iCond,iThs) = predictor_accumulate(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]), TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_num(iVec),...
+                                        TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_sim(iVec), cond_predictors(iCond,iThs));
+                                    %next ThreshAccum, SampLimitAccum
+                                    if strcmp(accumulator_types{iAccum},'ThreshAccum')
+                                        cond_predictors(iCond,iThs) = predictor_threshold_decide(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]), cond_predictors(iCond,iThs), params_t.condition_descision_threshold(iThs), max_cnt);
+                                    end
+                                    if strcmp(accumulator_types{iAccum},'SampLimitAccum')
+                                        cond_predictors(iCond,iThs) = predictor_counter_decide(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]), cond_predictors(iCond,iThs), params_t.condition_counter_limit(iThs));
+                                    end
+                                end
+                                PredictionResults(iTau).(params_t.compare_modes{iMode}).(accumulator_types{iAccum}) = cond_predictors;
+                            end
+                        else
+                            for iAccum = 1:length(accumulator_types)
+                                cond_predictors = PredictionResults(iTau).(params_t.compare_modes{iMode}){avch_length_bins}.(accumulator_types{iAccum});
+                                for iThs = 1:size(cond_predictors,2)
+                                    cond_predictors(iCond,iThs) = predictor_accumulate(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]){avch_length_bins}, TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_num(iVec),...
+                                        TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst(iEpoch).cluster_sim(iVec), cond_predictors(iCond,iThs));
+                                    %next ThreshAccum, SampLimitAccum
+                                    if strcmp(accumulator_types{iAccum},'ThreshAccum')
+                                        cond_predictors(iCond,iThs) = predictor_threshold_decide(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]){avch_length_bins}, cond_predictors(iCond,iThs), params_t.condition_descision_threshold(iThs), max_cnt);
+                                    end
+                                    if strcmp(accumulator_types{iAccum},'SampLimitAccum')
+                                        cond_predictors(iCond,iThs) = predictor_counter_decide(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]){avch_length_bins}, cond_predictors(iCond,iThs), params_t.condition_counter_limit(iThs));
+                                    end
+                                end
+                                PredictionResults(iTau).(params_t.compare_modes{iMode}){avch_length_bins}.(accumulator_types{iAccum}) = cond_predictors;
+                            end
+                        end
+                    end
+                end %for iVec
+
+                %next EpochAccum
+                if ~strcmp(params_t.compare_modes{iMode}, 'Len')
+                    PredictionResults(iTau).(params_t.compare_modes{iMode}).EpochAccum(iCond,1) = predictor_decide_last(PredictionResults(iTau).(params_t.compare_modes{iMode}).EpochAccum(iCond,1),[]);
+                    if iEpoch < length(TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst)
+                        PredictionResults(iTau).(params_t.compare_modes{iMode}).EpochAccum(iCond,1) = predictor_init_next(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]), PredictionResults(iTau).(params_t.compare_modes{iMode}).EpochAccum(iCond,1));
+                    end
+                else
+                    for iLen = 1:length(ClusteringData(iTau).ClustersLen)
+                        PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.EpochAccum(iCond,1) = predictor_decide_last(PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.EpochAccum(iCond,1),[]);
+                        if iEpoch < length(TestingSetClusters(iTau).(params_t.compare_modes{iMode})(iCond).EpochClst)
+                            PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.EpochAccum(iCond,1) = predictor_init_next(ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]){iLen}, PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.EpochAccum(iCond,1));
+                        end
+                    end
+                end
+
+            end %for iEpoch
+
+            %decide TotalAccum
+            if ~strcmp(params_t.compare_modes{iMode}, 'Len')
+                plot_title = ['total, mode: ' params_t.compare_modes{iMode} ', condition: ' num2str(iCond)];
+                PredictionResults(iTau).(params_t.compare_modes{iMode}).TotalAccum(iCond,1) = predictor_decide_last(PredictionResults(iTau).(params_t.compare_modes{iMode}).TotalAccum(iCond,1),plot_title);
+            else
+                for iLen = 1:length(ClusteringData(iTau).ClustersLen)
+                    PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.TotalAccum(iCond,1) = predictor_decide_last(PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.TotalAccum(iCond,1),[]);
+                end
+            end
+
+        end %for iCond
+    end %for iMode
+
+    %ROC & display
+    for iMode = 1:length(params_t.compare_modes)
+        if ~strcmp(params_t.compare_modes{iMode}, 'Len')
+            for iAccum = 1:length(accumulator_types)
+                PredictionResults(iTau).(params_t.compare_modes{iMode}).(accumulator_types{iAccum}) = calc_predictor_performance(PredictionResults(iTau).(params_t.compare_modes{iMode}).(accumulator_types{iAccum}),...
+                    ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]));
+                disp_str = ['Mode: ' params_t.compare_modes{iMode} ', ' accumulator_types{iAccum}];
+                diplay_predictor_results(PredictionResults(iTau).(params_t.compare_modes{iMode}).(accumulator_types{iAccum}), PredictionResults(iTau).CondIds, params_t,disp_str);
+            end
+        else
+            for iLen = 1:length(ClusteringData(iTau).ClustersLen)
+                for iAccum = 1:length(accumulator_types)
+                    PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.(accumulator_types{iAccum}) = calc_predictor_performance(PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.(accumulator_types{iAccum}),...
+                        ClusteringData(iTau).(['Stats' params_t.compare_modes{iMode}]){iLen});
+                    %disp_str = ['Mode: ' params_t.compare_modes{iMode} ', ' accumulator_types{iAccum} 'Avalanche Length: ' num2str(iLen,'%d')];
+                    %diplay_predictor_results(PredictionResults(iTau).(params_t.compare_modes{iMode}){iLen}.(accumulator_types{iAccum}), PredictionResults(iTau).CondIds, params_t, disp_str);
+                end
+            end
         end
-        
-    end %for iTau
+    end
+
+end %for iTau
+
+save([fp fn(1:end-4) '_pred.mat'],'PredictionResults');
     
-    save([fp files{iFile}(1:end-14) '_testpred.mat'],'PredictionResults');
-    
-end
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -209,15 +206,22 @@ predictor.conditions_prob_log10(:,end) = predictor.conditions_prob_log10(:,end) 
 predictor.ach_cnt(end) = predictor.ach_cnt(end) + 1;
 
 predictor.step_accum = [predictor.step_accum cluster_sim*log_p];
-step_av = median(abs(reshape(predictor.step_accum,1,[])));
-% step_av = mean(abs(reshape(predictor.step_accum,1,[])));
-% step_std = std(abs(predictor.conditions_prob_log10(:,end))/predictor.ach_cnt(end));
 conditions_prob_log10_sorted = sort(predictor.conditions_prob_log10(:,end),'descend');
-if step_av > 0 % step_std > 0 %
-    % if abs(conditions_prob_log10_sorted(1))+abs(conditions_prob_log10_sorted(2)) >0
-    predictor.decision_salience(end) = (conditions_prob_log10_sorted(1)-conditions_prob_log10_sorted(2))/step_av;
-    %predictor.decision_salience(end) = (conditions_prob_log10_sorted(1)-conditions_prob_log10_sorted(2))/step_std;
-    %predictor.decision_salience(end) = (conditions_prob_log10_sorted(1)-conditions_prob_log10_sorted(2))/(abs(conditions_prob_log10_sorted(1))+abs(conditions_prob_log10_sorted(2)));
+
+% %average-based salience
+% step_av = median(abs(reshape(predictor.step_accum,1,[]))); %mean % median
+% if step_av > 0
+%     predictor.decision_salience(end) = (conditions_prob_log10_sorted(1)-conditions_prob_log10_sorted(2))/step_av;
+
+%contrast-based salience
+if abs(conditions_prob_log10_sorted(1))+abs(conditions_prob_log10_sorted(2)) >0
+    predictor.decision_salience(end) = (conditions_prob_log10_sorted(1)-conditions_prob_log10_sorted(2))/(abs(conditions_prob_log10_sorted(1))+abs(conditions_prob_log10_sorted(2)));
+
+% %std-based salience: poor results    
+% step_std = std(abs(predictor.conditions_prob_log10(:,end))/predictor.ach_cnt(end));
+% if step_std > 0
+%     predictor.decision_salience(end) = (conditions_prob_log10_sorted(1)-conditions_prob_log10_sorted(2))/step_std;
+
 else
     predictor.decision_salience(end) = NaN;
 end
@@ -225,28 +229,34 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function predictor = predictor_threshold_decide(Stats, predictor, condition_descision_threshold, max_cnt)
 
+% max_cnt = 20;
 above_chance_thresh = log10(1/size(predictor.conditions_prob_log10,1));
-collapsing_thresh_factor = 1; %(1-predictor.ach_cnt(end)/max_cnt)
 
-if predictor.ach_cnt(end) > 0 && max(predictor.conditions_prob_log10(:,end)) > above_chance_thresh && ...
-        predictor.decision_salience(end) >= condition_descision_threshold*collapsing_thresh_factor
-    %max(predictor.conditions_prob_log10(:,end)) > condition_descision_threshold*collapsing_thresh_factor
-    predictor = predictor_decide_last(predictor);
-    predictor = predictor_init_next(Stats, predictor);
+if predictor.ach_cnt(end) > 0 && max(predictor.conditions_prob_log10(:,end)) > above_chance_thresh
+%     if predictor.decision_salience(end) >= condition_descision_threshold   %average-based salience or std-based salience
+    if predictor.decision_salience(end) >= condition_descision_threshold * (1-predictor.ach_cnt(end)/max_cnt)   %contrast-based salience. collapsing threshold due to saturation at high cnt 
+%     if max(predictor.conditions_prob_log10(:,end)) > condition_descision_threshold   %static threshold
+        plot_title = [];%['thresh = ' num2str(condition_descision_threshold * (1-predictor.ach_cnt(end)/max_cnt),'%1.2f')];
+        predictor = predictor_decide_last(predictor,plot_title);
+        predictor = predictor_init_next(Stats, predictor);
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function predictor = predictor_counter_decide(Stats, predictor, condition_counter_limit)
 
 if predictor.ach_cnt(end) >= condition_counter_limit
-    predictor = predictor_decide_last(predictor);
+    predictor = predictor_decide_last(predictor,[]);
     predictor = predictor_init_next(Stats, predictor);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function predictor = predictor_decide_last(predictor)
+function predictor = predictor_decide_last(predictor,plot_title)
 if predictor.ach_cnt(end) > 0
     [~,predictor.decision_cond(end)] = max(predictor.conditions_prob_log10(:,end));
+end
+if ~isempty(plot_title)
+    figure;plot(predictor.step_accum');xlabel('step');title(['Accumulators - ' plot_title]);legend('cond 1','cond 2','cond 3','cond 4');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -285,7 +295,7 @@ for iThs = 1:size(cond_predictors,2)
     for iCond = 1:nof_cond
         cond_predictors(iCond,iThs).roc.tp = p_det_m(iCond,iCond);
         normalized_p_cond = Stats.P_cond(cond_idx(cond_idx~=iCond))/sum(Stats.P_cond(cond_idx(cond_idx~=iCond))); %same as divide by (1-Stats.P_cond(iCond,iThs))
-        cond_predictors(iCond,iThs).roc.fa = normalized_p_cond * p_det_m(cond_idx(cond_idx~=iCond),iCond);
+        cond_predictors(iCond,iThs).roc.fa = normalized_p_cond * p_det_m(iCond,cond_idx(cond_idx~=iCond))';
         
         %fa_total = fa_total + cond_predictors(iCond,iThs).roc.fa *(1-Stats.P_cond(iCond,iThs)); % can be calculated this way as well
         
@@ -356,5 +366,5 @@ end
 %     '  FA_sal=' num2str(cond_predictors(1,1).roc.fa_av_salience_total,'%1.2f')...
 %     '  TP_cnt=' num2str(cond_predictors(1,1).roc.tp_av_cnt_total,'%1.2f')...
 %     '  FA_cnt=' num2str(cond_predictors(1,1).roc.fa_av_cnt_total,'%1.2f')  '  -    ' disp_str_roc]);
-% disp('tested (row) VS detected (columns) conditions probability:');
-% disp(num2str(cond_predictors(1,1).roc.p_det_m));
+disp([disp_str '  tested (row) VS detected (columns) conditions probability:']);
+disp(num2str(cond_predictors(1,1).roc.p_det_m));
