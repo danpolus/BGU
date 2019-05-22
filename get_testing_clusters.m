@@ -100,8 +100,15 @@ for iClust = 1:length(clusters)
                 plot_hist(iClust,:) = plot_hist(iClust,:) + v_compare;
             end
         end
+        if clusters_similarity(iClust) == 1 % >0.7 %nearest neighbour
+            %figure;stem([v_compare; v]');legend('nearest cluster vector','vector');
+            break;
+        end
     end
     %clusters_similarity(iClust) = clusters_similarity(iClust)/length(ClusterAchIds); %average 
+    if clusters_similarity(iClust) == 1
+        break;
+    end
 end
 [cluster_sim,max_inx] = max(clusters_similarity);
 cluster_num = clusters(max_inx);

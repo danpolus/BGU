@@ -1,23 +1,18 @@
 %
 %Step 1
 %
-% Instructions For Manual Rejection:
-% ----------------------------------
-% 1. If nof channels > 10%, reject the whole epoch
-% 2. Absolute threshlolds should be the same for single subject scenario
-% 3. Use manual channel epoch rejection for final adjustment
-%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clear all
 close all
 
-signal_uV_th = 50; %absolute threshlolds should be the same for single subject scenario
-spacing_uV = 100;
+bad_chan_in_epoch_percent = 0.1; %percent of bad channels in epoch to consider it bad
+epoch_noise_zScore_th = 7; %-> play with it .  channel zscore in epoch, to consider channel bad. Should be at least twice than avalanche detection zThresh
+minimal_nof_bad_pnts_epoch_chan = 1; %minimal number of threshold crossed points in epoch in channel in order to reject it
 %
-bad_channel_zScore_th = 3;
-epoch_noise_zScore_th = 6;
+bad_channel_zScore_th = 3; 
+bad_channel_time_percent = 0.15; %part of bad data in channel to mark it bad 
+minimal_interchannel_correlation = 0.6;
 %
-bad_time_percent = 0.3; %part of bad data in channel to mark it bad 
 LOW_PASS_HZ = 45;
 fp = 'D:\My Files\Work\BGU\datasets\Panas\';
 CHANNEL_LOCATION_FILE_INTERPOLATE = 'D:\My Files\Work\BGU\scripts\Mental-Imagery\electrodes\chanlocs60.sfp';
@@ -30,73 +25,68 @@ EEG = pop_loadset([fp fn]);
 %low-pass filter
 EEG = pop_eegfiltnew(EEG, [], LOW_PASS_HZ);
 
-EEG = pop_saveset(eeg_checkset(EEG), 'filename',[EEG.filepath '\' EEG.filename(1:end-4) '_FiltClean.set'], 'savemode','onefile');
+%CLEAN NOISE
+EEG.bad_channels = [];                            
+EEG.reject.rejglobal = zeros(1,EEG.trials);
+EEG.reject.rejglobalE = zeros(EEG.nbchan,EEG.trials);
+EEG = pop_reref(EEG,[]);
+EEG_epochsConcat = eeg2epoch(EEG);
 
-EEG.bad_channels = [];
+%find bad chanels: badly correlated with other chanels
+[EEG_clean,~,~] = clean_artifacts(EEG_epochsConcat, ...
+                                'ChannelCriterion', minimal_interchannel_correlation,... 
+                                'ChannelCriterionMaxBadTime', bad_channel_time_percent*2 ,...
+                                'NoLocsChannelCriterion', 'off',...
+                                'NoLocsChannelCriterionExcluded', 'off',...
+                                'LineNoiseCriterion',  'off',...
+                                'FlatlineCriterion', 'off',...
+                                'BurstCriterion',    'off',... % epoch_noise_zScore_th,...
+                                'BurstCriterionRefMaxBadChns', 'off',...
+                                'BurstCriterionRefTolerances', 'off',...
+                                'WindowCriterion',   'off',... %bad_chan_in_epoch_percent,...
+                                'WindowCriterionTolerances', 'off',... %[-epoch_noise_zScore_th epoch_noise_zScore_th],...
+                                'Highpass',          'off');
+if isfield(EEG_clean.etc, 'clean_channel_mask')
+    EEG.bad_channels = unique([EEG.bad_channels find(EEG_clean.etc.clean_channel_mask == 0)']);
+end
+% if isfield(EEG_clean.etc, 'clean_sample_mask')
+%     for ep=1:EEG.trials
+%         if sum(EEG_clean.etc.clean_sample_mask((ep-1)*EEG.pnts+1 : ep*EEG.pnts) == 0) > 0
+%             EEG.reject.rejglobal(ep) = 1;
+%             EEG.reject.rejglobalE(:,ep) = 1;
+%         end
+%     end
+% end
 
-%auto bad channels
-EEG_epochsConcat = pop_reref(EEG,[]);
-EEG_epochsConcat.data = reshape(EEG_epochsConcat.data, size(EEG_epochsConcat.data,1), []);
-EEG_epochsConcat.trials = 1;  EEG_epochsConcat.epoch = []; EEG_epochsConcat.pnts = size(EEG_epochsConcat.data,2);
-auto_bad_channels = find_bad_cahnnels(EEG_epochsConcat.data, EEG_epochsConcat.srate, 'window_step_length_sec', EEG.pnts/EEG.srate, 'bad_time_percent', bad_time_percent/2, 'max_amp_score_thresh', bad_channel_zScore_th, 'min_amp_score_thresh', 1/bad_channel_zScore_th);
-disp([EEG.setname '    suspected bad channels: ' num2str(auto_bad_channels) '?']);
+%find bad chanels: high std
+EEG.bad_channels = unique([EEG.bad_channels find_bad_cahnnels(EEG_epochsConcat.data, EEG_epochsConcat.srate, 'window_step_length_sec', EEG.pnts/EEG.srate,...
+    'bad_time_percent', bad_channel_time_percent, 'max_amp_score_thresh', bad_channel_zScore_th, 'min_amp_score_thresh', 0)]);
 
-% %manual bad channels
-% csc_eeg_plotter(EEG_epochsConcat);
-% manual_bad_channels = cell2mat(hidden_channels(:,2))';
-% EEG.bad_channels = [EEG.bad_channels manual_bad_channels];
-% %EEG = pop_select( EEG,'nochannel', manual_bad_channels);
-% EEG = pop_saveset(eeg_checkset(EEG), 'filename',[EEG.filepath '\' EEG.filename], 'savemode','onefile');
+%find bad chanels in epochs
+% EEG_ = pop_eegfiltnew(EEG, 15,[]); %use high-passed data
+bad_epoch_chan = find_bad_epoch_channels(EEG.data, 'minimal_nof_bad_pnts', minimal_nof_bad_pnts_epoch_chan, 'z_score_thresh', epoch_noise_zScore_th);
+bad_epoch_chan(EEG.bad_channels,:) = 0;
+EEG.reject.rejglobal(sum(bad_epoch_chan,1)/(EEG.nbchan-length(EEG.bad_channels)) > bad_chan_in_epoch_percent) = 1;
+EEG.reject.rejglobalE(bad_epoch_chan > 0) = 1;
+EEG.reject.rejglobalE(EEG.bad_channels,:) = 1;
 
-
-%BAD EPOCHS AND CHANNELS
-%reject extream uV values
-EEG = pop_eegthresh(EEG, 1, 1:EEG.nbchan, -signal_uV_th, signal_uV_th, EEG.xmin, EEG.xmax, 0, 0);
-% %Reject abnormal trend
-% EEG = pop_rejtrend(EEG,1,1:EEG.nbchan ,150,50,0.3,2,0);
-% %Reject by epoch and channel z-score
-% EEG = pop_jointprob(EEG, 1, 1:EEG.nbchan, epoch_noise_zScore_th, bad_channel_zScore_th, 0, 0, 0, [], 0);
-%Reject channels kurtosis
-% EEG = pop_rejkurt(EEG, 1, 1:EEG.nbchan, epoch_noise_zScore_th, bad_channel_zScore_th, 0, 0, 0, [], 0);
-EEG = eeg_rejsuperpose(EEG, 1, 1, 1, 1, 1, 1, 1, 1);
-%Update automatic rejection manualy
+%plot
+channels_color = repmat({'b'},1,size(EEG.data,1));   
+channels_color(EEG.bad_channels) = {'r'};
 EEG.reject.rejmanual = EEG.reject.rejglobal;
 EEG.reject.rejmanualE = EEG.reject.rejglobalE;
-ALLEEG = EEG; CURRENTSET = 1;
-pop_eegplot(EEG, 1, 0, 0, [], 'srate',EEG.srate, 'winlength',10, 'spacing', spacing_uV, 'eloc_file', []);
-return;
-%%%%
-%Manual channel epoch rejection. ENTER ALL HERE:
+pop_eegplot(EEG, 1, 0, 0, [], 'srate',EEG.srate, 'winlength',10, 'color', channels_color, 'spacing',60, 'eloc_file',[]);
+%
 
-ALLEEG.reject.rejglobalE(:,[16 78 97]) = 0;
+%remove bad epochs
+EEG.reject_hstr.rejglobal = EEG.reject.rejglobal;
+EEG.reject_hstr.rejglobalE = EEG.reject.rejglobalE;
+EEG = pop_rejepoch(EEG, EEG.reject.rejglobal ,0);
 
-bad_channels_manual = [];
-EEG.bad_channels = [EEG.bad_channels bad_channels_manual];
-%%%%
-EEG.reject_hstr.rejmanual = ALLEEG.reject.rejmanual;
-EEG.reject_hstr.rejglobalE = ALLEEG.reject.rejglobalE;
-EEG = pop_rejepoch(EEG, EEG.reject.rejmanual ,0);
-%%%
-bad_epoch_chan = EEG.reject_hstr.rejglobalE(:,~EEG.reject_hstr.rejmanual);
-% bad_channels_auto = find(mean(bad_epoch_chan,2) > bad_time_percent);
-% EEG.bad_channels = [EEG.bad_channels bad_channels_auto];
-EEG = pop_saveset(eeg_checkset(EEG), 'filename',[EEG.filepath '\' EEG.filename], 'savemode','onefile');
-
-
-%BAD CHANNELS SPECTRA
-EEG_epochsConcat = pop_reref(EEG,[]);
-for iEpoch=1:EEG_epochsConcat.trials
-    EEG_epochsConcat.data(bad_epoch_chan(:,iEpoch),:,iEpoch) = 0;
-end
-EEG_epochsConcat.data = reshape(EEG_epochsConcat.data, size(EEG_epochsConcat.data,1), []);
-EEG_epochsConcat.trials = 1;  EEG_epochsConcat.epoch = []; EEG_epochsConcat.pnts = size(EEG_epochsConcat.data,2);
-bad_channels_spectra = channel_map_topoplot(EEG_epochsConcat, [], true);
-return
-EEG.bad_channels = [EEG.bad_channels bad_channels_spectra];
-
-%INTERPOLATE BAD CHANNELS
-EEG.bad_channels = unique(EEG.bad_channels);
+% %for calculation others than Avalanche Detection, interpolate bad channels
 % EEG = pop_select( EEG, 'nochannel', EEG.bad_channels);
 % EEG = eeg_interp(EEG, readlocs(CHANNEL_LOCATION_FILE_INTERPOLATE));
-EEG = pop_saveset(eeg_checkset(EEG), 'filename',[EEG.filepath '\' EEG.filename], 'savemode','onefile');
-% EEG = pop_saveset(eeg_checkset(EEG), 'savemode','resave');
+
+EEG = pop_reref(EEG,[]);
+
+EEG = pop_saveset(eeg_checkset(EEG), 'filename',[EEG.filepath '\' EEG.filename(1:end-4) '_FiltClean.set'], 'savemode','onefile');

@@ -34,11 +34,8 @@ param.optimal_sigma = 1;
 std_TH = 3.0; %set ZsubjTh3 to appears in folder name. try 3.5?
 % Zfile means that mean and std calculated per file
 % Zsubj means that mean and std calculated over all subject files for the same scenario
-
-zero_bad_epoch_channels_flg = true; %true -> BEfile_BC####, false ->BEnone_BCnone set to appear in folder name
-zero_bad_chanels_flg = true ;% false -> BCnone set to appear in folder name
-zero_subj_scenario_bad_channels_flg = false; %true -> BCsubj, false -> BCfile set to appear in folder name
-zscore_mode = 'file'; % epoch file scenario
+zscore_mode = 'file'; % epoch / file / scenario -> play with it
+zero_subj_scenario_bad_channels_flg = false; %combine bad channels from same subject -> play with it
 
 %%%%%%%%%%%%%%%%%%%%
 
@@ -49,7 +46,7 @@ if strcmp(zscore_mode, 'scenario')
     EEG_data_reshaped = [];
     for iFile = 1:length(files)
         EEG = pop_loadset([fp files{iFile}]);
-        bad_epoch_chan = EEG.reject_hstr.rejglobalE(:,~EEG.reject_hstr.rejmanual);
+        bad_epoch_chan = boolean(EEG.reject_hstr.rejglobalE(:,~EEG.reject_hstr.rejglobal));
         for iEpoch=1:EEG.trials
             EEG.data(bad_epoch_chan(:,iEpoch),:,iEpoch) = NaN; %set bad epoch channels to NaN
         end
@@ -84,6 +81,13 @@ for iFile = 1:length(files)
     end
     
     EEG = pop_loadset([fp files{iFile}]);
+    bad_epoch_chan = boolean(EEG.reject_hstr.rejglobalE(:,~EEG.reject_hstr.rejglobal));
+    if zero_subj_scenario_bad_channels_flg
+        bad_epoch_chan(subj_scenario_bad_channels,:) = true;
+    end
+    for iEpoch=1:EEG.trials
+        EEG.data(bad_epoch_chan(:,iEpoch),:,iEpoch) = NaN; %set bad epoch channels to NaN
+    end
     
     %zscore
     if strcmp(zscore_mode, 'file')
@@ -97,24 +101,10 @@ for iFile = 1:length(files)
         EEG.data = (EEG.data - subj_mean_mat)./ subj_std_mat;    
     end
     if strcmp(zscore_mode, 'epoch') 
-        EEG.data = zscore(EEG.data,0,2);
+        EEG.data = normalize(EEG.data,2,'zscore'); 
     end
-    EEG.data(isinf(EEG.data) | isnan(EEG.data)) = 0;
-    
-    %set bad data to 0
-    if zero_bad_epoch_channels_flg
-        bad_epoch_chan = EEG.reject_hstr.rejglobalE(:,~EEG.reject_hstr.rejmanual);
-        if zero_bad_chanels_flg
-            bad_epoch_chan(EEG.bad_channels,:) = 1;
-            if zero_subj_scenario_bad_channels_flg
-                bad_epoch_chan(subj_scenario_bad_channels,:) = 1;
-            end
-        end
-        for iEpoch=1:EEG.trials
-            EEG.data(bad_epoch_chan(:,iEpoch),:,iEpoch) = 0; %set bad epoch channels to 0
-        end
-    end
-    
+    EEG.data(isinf(EEG.data) | isnan(EEG.data)) = 0; %set bad epoch channels to 0
+
     %plot
     EEG_plot = pop_eegthresh(EEG, 1, 1:EEG.nbchan, -std_TH, std_TH, EEG.xmin, EEG.xmax, 0, 0);
     EEG_plot = eeg_rejsuperpose(EEG_plot, 1, 1, 1, 1, 1, 1, 1, 1);
