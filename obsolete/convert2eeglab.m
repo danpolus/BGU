@@ -1,8 +1,6 @@
 %
 %Step 0
 %
-% problem with experiment setup - constant visual cue during speech imagery
-% problem with filters: why apply them? sometimes not applied or not work well (60Hz Notch)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 clear all
