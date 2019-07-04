@@ -1,19 +1,18 @@
 %
 %Step 1 : eeglab_clean - clean subject data with eeglab
 %
-% inputs
+%  inputs:
 % fp
 % fn - mat file name
 % interpolateBadChannelsFlg
 % saveFlg
 % plotFlg
 %
-% outputs
+%  outputs:
 % EEGSets - cleaned data separated into words and conditions, as EEGlab sets
-% FileInfoSets - EEGlab sets info
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [EEGSets, FileInfoSets] = eeglab_clean(fp, fn, interpolateBadChannelsFlg, saveFlg, plotFlg)
+function EEGSets = eeglab_clean(fp, fn, interpolateBadChannelsFlg, saveFlg, plotFlg)
 
 CHANNEL_LOCATION_FILE = 'D:\My Files\Work\BGU\scripts\Mental-Imagery\electrodes\chanlocs64.sfp';
 CHANNEL_LOCATION_FILE_INTERPOLATE = 'D:\My Files\Work\BGU\scripts\Mental-Imagery\electrodes\chanlocs60.sfp';
@@ -38,7 +37,6 @@ minimal_interchannel_correlation = 0.6;
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 
 EEGSets = [];
-FileInfoSets = [];
 
 k = strfind(fp,'\');
 output_fp = [fp(1:k(end-1)) 'eeglab\'];
@@ -82,6 +80,8 @@ for iCond = 1:length(conditions)
         
         %create eeglab dataset
         EEG = pop_importdata('setname',[FileInfo.scenario  ' ' conditions{iCond} ' word' num2str(iWord) ' - ' fn(1:end-4)], 'data',dataset_mat, 'dataformat','array', 'chanlocs',CHANNEL_LOCATION_FILE, 'nbchan',size(dataset_mat,1), 'pnts',size(dataset{1,1},2), 'srate',fs);
+        
+        EEG.FileInfo = FileInfo;
         
         %remove eog channels
         EEG = pop_select( EEG,'nochannel', EOG_CHANNELS);
@@ -148,7 +148,7 @@ for iCond = 1:length(conditions)
         EEG = pop_rejepoch(EEG, EEG.reject.rejglobal ,0);
         
         %for calculation others than Avalanche Detection, interpolate bad channels
-        if interpolateBadChannelsFlg
+        if interpolateBadChannelsFlg && ~isempty(EEG.bad_channels)
             EEG = pop_select( EEG, 'nochannel', EEG.bad_channels);
             EEG = eeg_interp(EEG, readlocs(CHANNEL_LOCATION_FILE_INTERPOLATE));
         end
@@ -156,7 +156,6 @@ for iCond = 1:length(conditions)
         EEG = pop_reref(EEG,[]);
         
         EEGSets = [EEGSets eeg_checkset(EEG)];
-        FileInfoSets = [FileInfoSets FileInfo];
 
         %save eeglab set and csv file
         if saveFlg

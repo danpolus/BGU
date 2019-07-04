@@ -1,6 +1,14 @@
 
 function params_t = global_params()
 
+params_t.max_tau_sec = 0.04; %maximal tau is 40msec
+params_t.optimal_alpha = -1.5;
+params_t.optimal_sigma = 1;
+params_t.std_TH = 3.0; %try 3.5?
+params_t.zscore_mode = 'file'; % epoch / file / scenario -> play with it
+params_t.zero_subj_scenario_bad_channels_flg = false; %combine bad channels from same subject -> play with it
+
+
 %the raster matrix is not necessary binary. it counts events per bin, so it's values can be >1. it can also contain amplitudes
 %for now, make it binary (OTHER OPTIONS NEVER TESTED OR DEBUGED)
 params_t.raster_input_type = 'binary'; % 'binary' 'events_cnt' 'amplitude' -> set to appear in folder name as well
