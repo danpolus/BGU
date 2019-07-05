@@ -24,6 +24,7 @@ parfor iFile = 1:length(files)
 %     end
     
     AvalancheFileDataSets = extract_avalanches(EEGSets, 0);
+    [MultiFileAchVecs, usedTauInfo] = get_avalanche_vectors(AvalancheFileDataSets, 1);
     
     
     

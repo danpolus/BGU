@@ -39,9 +39,8 @@ minimal_interchannel_correlation = 0.6;
 EEGSets = [];
 
 k = strfind(fp,'\');
-output_fp = [fp(1:k(end-1)) 'eeglab\'];
-mkdir(output_fp);
-
+FileInfo.base_fp = fp(1:k(end-1));
+FileInfo.orig_fn = fn(1:end-4);
 if contains(fp,'Long_words')
     FileInfo.scenario = '1LongWords';
 elseif contains(fp,'Short_long_words')
@@ -52,6 +51,11 @@ elseif contains(fp,'Vowels')
     FileInfo.scenario = '4Vowels';
 end
 FileInfo.subj_id = fn(5:6);
+
+if saveFlg
+    output_fp = [FileInfo.base_fp '1 eeglab\'];
+    mkdir(output_fp);
+end
 
 eeg_data_wrt = load(fullfile(fp,fn));
 
@@ -67,7 +71,7 @@ for iCond = 1:length(conditions)
     dataset = eval(['eeg_data_wrt.' dataset_name conditions{iCond}]);
     
     for iWord = 1:size(dataset,1)
-        FileInfo.word_num = iWord;
+        FileInfo.word_num = num2str(iWord);
         dataset_mat = cell2mat(dataset(iWord,:));
         
         %check correct nof channels
@@ -79,7 +83,7 @@ for iCond = 1:length(conditions)
         end
         
         %create eeglab dataset
-        EEG = pop_importdata('setname',[FileInfo.scenario  ' ' conditions{iCond} ' word' num2str(iWord) ' - ' fn(1:end-4)], 'data',dataset_mat, 'dataformat','array', 'chanlocs',CHANNEL_LOCATION_FILE, 'nbchan',size(dataset_mat,1), 'pnts',size(dataset{1,1},2), 'srate',fs);
+        EEG = pop_importdata('setname',[FileInfo.scenario  ' ' conditions{iCond} ' word' num2str(iWord) ' - ' FileInfo.orig_fn], 'data',dataset_mat, 'dataformat','array', 'chanlocs',CHANNEL_LOCATION_FILE, 'nbchan',size(dataset_mat,1), 'pnts',size(dataset{1,1},2), 'srate',fs);
         
         EEG.FileInfo = FileInfo;
         
@@ -88,7 +92,7 @@ for iCond = 1:length(conditions)
         
 %         %save berfore cleaning
 %         if saveFlg
-%             output_fn = [output_fp fn(1:end-4) '_' conditions{iCond} '_word' num2str(iWord) '_dirty'];
+%             output_fn = [output_fp FileInfo.orig_fn '_' conditions{iCond} '_word' num2str(iWord) '_dirty'];
 %             EEG = pop_saveset(eeg_checkset(EEG), 'filename',[output_fn '.set'], 'savemode','onefile');
 %             csvwrite([output_fn '_ch' num2str(EEG.nbchan) '_pt' num2str(EEG.pnts) '_ep' num2str(EEG.trials) '_fs' num2str(EEG.srate) '.csv'], reshape(EEG.data,size(EEG.data,1),[]));
 %         end
@@ -159,7 +163,7 @@ for iCond = 1:length(conditions)
 
         %save eeglab set and csv file
         if saveFlg
-            output_fn = [output_fp fn(1:end-4) '_' conditions{iCond} '_word' num2str(iWord)];
+            output_fn = [output_fp FileInfo.orig_fn '_' conditions{iCond} '_word' num2str(iWord)];
             EEG = pop_saveset(eeg_checkset(EEG), 'filename',[output_fn '.set'], 'savemode','onefile');
             csvwrite([output_fn '_ch' num2str(EEG.nbchan) '_pt' num2str(EEG.pnts) '_ep' num2str(EEG.trials) '_fs' num2str(EEG.srate) '.csv'], reshape(EEG.data,size(EEG.data,1),[]));
         end

@@ -1,92 +1,89 @@
 %
-%Step 3
-% prepare vectors and Ids
+%Step 3 : prepare vectors and Ids
+%
+%  inputs:
+% AvalancheFileDataSets - avalanches extracted from each EEGlab set
+% saveFlg
+%
+%  outputs:
+% MultiFileAchVecs - avalanche vectors from all sets
+% usedTauInfo - used taus info (optimal or others)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function get_avalanche_vectors()
-
-clear all
-close all
-
-fp = 'D:\My Files\Work\BGU\datasets\Panas\';
+function [MultiFileAchVecs, usedTauInfo] = get_avalanche_vectors(AvalancheFileDataSets, saveFlg)
 
 %consider 60 or 64 electrodes vector
 convert60to64channels_flg = 0;
 
 params_t = global_params();
+dataInfo = AvalancheFileDataSets(1).dataInfo;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-[files, fp] = uigetfile([fp '*.mat'], 'Select avalanche files','MultiSelect','on');
-if ~iscell(files) %in case only 1 file selected
-    files = {files};
+if saveFlg
+    output_fp = [dataInfo.FileInfo.base_fp '2 avalanches\'];
+    mkdir(output_fp);
 end
-
+    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %calc optimal tau
 
-AvalancheFileData = load([fp files{1}],'all_epochs','param','file_info');
-for iTau = 1:length(AvalancheFileData.param.tau_vec)
+for iTau = 1:length(dataInfo.tau_vec)
     multi_files_epochs(iTau).av_size_vec = [];
     multi_files_epochs(iTau).sigma_vec = [];
 end
-for iFile = 1:length(files)
-    AvalancheFileData = load([fp files{iFile}]);
-    [~,tau_optimal_inxs(iFile)] = min(sqrt(([AvalancheFileData.all_epochs.sigma] - AvalancheFileData.param.optimal_sigma).^2 + (-[AvalancheFileData.all_epochs.alpha] - AvalancheFileData.param.optimal_alpha).^2));
-    for iTau = 1:length(AvalancheFileData.param.tau_vec)
-        multi_files_epochs(iTau).av_size_vec = [multi_files_epochs(iTau).av_size_vec  AvalancheFileData.all_epochs(iTau).av_size_vec];
-        multi_files_epochs(iTau).sigma_vec = [multi_files_epochs(iTau).sigma_vec  AvalancheFileData.all_epochs(iTau).sigma_vec];
+for iAvalancheDataSets = 1:length(AvalancheFileDataSets)
+    all_epochs = AvalancheFileDataSets(iAvalancheDataSets).all_epochs;
+    [~,tau_optimal_inxs(iAvalancheDataSets)] = min(sqrt(([all_epochs.sigma] - params_t.optimal_sigma).^2 + (-[all_epochs.alpha] - params_t.optimal_alpha).^2));
+    for iTau = 1:length(dataInfo.tau_vec)
+        multi_files_epochs(iTau).av_size_vec = [multi_files_epochs(iTau).av_size_vec  all_epochs(iTau).av_size_vec];
+        multi_files_epochs(iTau).sigma_vec = [multi_files_epochs(iTau).sigma_vec  all_epochs(iTau).sigma_vec];
     end
 end
-for iTau = 1:length(AvalancheFileData.param.tau_vec)
-    multi_files_epochs(iTau).alpha = estimateParamML(AvalancheFileData.param.ES.min,AvalancheFileData.param.ES.max,'zeta',-AvalancheFileData.param.optimal_alpha,multi_files_epochs(iTau).av_size_vec);
+for iTau = 1:length(dataInfo.tau_vec)
+    multi_files_epochs(iTau).alpha = estimateParamML(dataInfo.ES.min,dataInfo.ES.max,'zeta',-params_t.optimal_alpha,multi_files_epochs(iTau).av_size_vec);
     multi_files_epochs(iTau).sigma = mean(multi_files_epochs(iTau).sigma_vec);
 end
-[~,multi_files_tau_optimal_idx] = min(sqrt(([multi_files_epochs.sigma] - AvalancheFileData.param.optimal_sigma).^2 + (-[multi_files_epochs.alpha] - AvalancheFileData.param.optimal_alpha).^2));
+[~,multi_files_tau_optimal_idx] = min(sqrt(([multi_files_epochs.sigma] - params_t.optimal_sigma).^2 + (-[multi_files_epochs.alpha] - params_t.optimal_alpha).^2));
 if strcmp(params_t.taus_to_use, 'all')
-    tau_idxs = 1:length(AvalancheFileData.param.tau_vec);
+    tau_idxs = 1:length(dataInfo.tau_vec);
 else
     tau_idxs = unique([tau_optimal_inxs multi_files_tau_optimal_idx]);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %extract avalanche vectors
-%compute similarity matrices for each file
 
-multiple_files_fn = 'MultiFile';
 MultiFileAchVecs = [];
-for iFile = 1:length(files)
+for iAvalancheDataSets = 1:length(AvalancheFileDataSets)
     
-    AvalancheFileData = load([fp files{iFile}]);
-    file_id = ['scn' AvalancheFileData.file_info.scenario(1) 'sbj' AvalancheFileData.file_info.subj_id 'cnd' ...
-        AvalancheFileData.file_info.condition(1) 'wrd' AvalancheFileData.file_info.word_num 'fln' num2str(iFile,'%03d')];
-    multiple_files_fn = [multiple_files_fn '_' file_id];
+    all_epochs = AvalancheFileDataSets(iAvalancheDataSets).all_epochs;
+    setDataInfo = AvalancheFileDataSets(iAvalancheDataSets).dataInfo;
+
+    file_id = ['scn' setDataInfo.FileInfo.scenario(1) 'sbj' setDataInfo.FileInfo.subj_id 'cnd' ...
+        setDataInfo.FileInfo.condition(1) 'wrd' setDataInfo.FileInfo.word_num 'fln' num2str(iAvalancheDataSets,'%03d')];
     
     AvalancheVectors = [];
-    SimilarityMat = [];
+%     SimilarityMat = [];
     for iTau = tau_idxs
         
-        if strcmp(params_t.taus_to_use, 'optimal_multi_files') && iTau ~= multi_files_tau_optimal_idx && iTau ~= tau_optimal_inxs(iFile)
+        if strcmp(params_t.taus_to_use, 'optimal_multi_files') && iTau ~= multi_files_tau_optimal_idx && iTau ~= tau_optimal_inxs(iAvalancheDataSets)
             continue;
         end
-        
-%         tic
-        display(['calc similarity: ' files{iFile} '  tau: ' num2str(AvalancheFileData.param.tau_vec(iTau))]);
         
         %prepare avalanche vectors
         AvalancheVectors(iTau).epochs_vecs = [];
         AvalancheVectors(iTau).Id = [];
         AvalancheVectors(iTau).IdLen = [];
-        AvalancheVectors(iTau).tau = AvalancheFileData.param.tau_vec(iTau);
-        AvalancheVectors(iTau).is_optimal_tau = iTau == tau_optimal_inxs(iFile);
+        AvalancheVectors(iTau).tau = dataInfo.tau_vec(iTau);
+        AvalancheVectors(iTau).is_optimal_tau = iTau == tau_optimal_inxs(iAvalancheDataSets);
         if convert60to64channels_flg
             AvalancheVectors(iTau).nof_channels = 64;
         else
-            AvalancheVectors(iTau).nof_channels = size(AvalancheFileData.all_epochs(1).av_raster_epochs,1);
+            AvalancheVectors(iTau).nof_channels = size(all_epochs(1).av_raster_epochs,1);
         end
         AvalancheVectors(iTau).file_id = file_id;
-        for iEpoch = 1:size(AvalancheFileData.all_epochs(iTau).av_raster_epochs,3)
-            AvalancheVectors(iTau).epochs_vecs{iEpoch} = raster2vectors(AvalancheFileData.all_epochs(iTau).av_raster_epochs(:,:,iEpoch), params_t.raster_input_type, convert60to64channels_flg);
+        AvalancheVectors(iTau).dataInfo = setDataInfo;
+        for iEpoch = 1:size(all_epochs(iTau).av_raster_epochs,3)
+            AvalancheVectors(iTau).epochs_vecs{iEpoch} = raster2vectors(all_epochs(iTau).av_raster_epochs(:,:,iEpoch), params_t.raster_input_type, convert60to64channels_flg);
             if ~isempty(AvalancheVectors(iTau).epochs_vecs{iEpoch})
                 avch_length_bins = [AvalancheVectors(iTau).epochs_vecs{iEpoch}.length_bins];
                 for iAvalanche=1:length(avch_length_bins)
@@ -113,24 +110,26 @@ for iFile = 1:length(files)
 %         SimilarityMat(iTau).IdLen = AvalancheVectors(iTau).IdLen;
 %         SimilarityMat = calc_similarity_mat(SimilarityMat, AvalancheVectors, iTau, params_t.similarity_method);
                 
-%         toc
     end %for iTau
     
-    MultiFileAchVecs{iFile} = AvalancheVectors;
+    MultiFileAchVecs{iAvalancheDataSets} = AvalancheVectors;
     
-end % for iFile
+end % for iAvalancheDataSets
 
-tau.tau_vec = AvalancheFileData.param.tau_vec;
-tau.tau_idxs = tau_idxs;
-tau.multi_files_tau_optimal_idx = multi_files_tau_optimal_idx;
-save([fp multiple_files_fn '.mat'],'MultiFileAchVecs','tau');
+usedTauInfo.tau_vec = dataInfo.tau_vec;
+usedTauInfo.tau_idxs = tau_idxs;
+usedTauInfo.multi_files_tau_optimal_idx = multi_files_tau_optimal_idx;
+
+if saveFlg
+    save([output_fp dataInfo.FileInfo.orig_fn '_avalanches.mat'],'MultiFileAchVecs','usedTauInfo');
+end
 
 
 % %debug plot
 % figure;
 % epoch_to_plot = 7;
-% RasterPlot(AvalancheFileData.all_epochs(multi_files_tau_optimal_idx).av_raster_epochs(:,:,epoch_to_plot),AvalancheFileData.param.Fs,AvalancheFileData.param.tau_vec(multi_files_tau_optimal_idx));
-% title(['Raster:  \tau = ' num2str(1000*AvalancheFileData.param.tau_vec(multi_files_tau_optimal_idx)) ' ms    epoch #' num2str(epoch_to_plot)]);
+% RasterPlot(all_epochs(multi_files_tau_optimal_idx).av_raster_epochs(:,:,epoch_to_plot),dataInfo.fs,dataInfo.tau_vec(multi_files_tau_optimal_idx));
+% title(['Raster:  \tau = ' num2str(1000*dataInfo.tau_vec(multi_files_tau_optimal_idx)) ' ms    epoch #' num2str(epoch_to_plot)]);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
