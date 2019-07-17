@@ -1,24 +1,30 @@
 %
-%Step 5
-% hierarcial clustering
-% https://www.mathworks.com/help/stats/hierarchical-clustering.html
+%Step 5 : cluster_avalanches - hierarcial clustering; generate statistics
+%https://www.mathworks.com/help/stats/hierarchical-clustering.html
 %
-% generate statistics
+%  inputs:
+% MultiFileAchVecs - avalanche vectors from all sets
+% SimilarityMat - similarity between avalanches distances matrix
+% TestingSet - avalanches (epochs) for testing
+% saveFlg
+% plotFlg
+%
+%  outputs:
+% ClusteringData - clusters and statistics
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function cluster_avalanches()
-
-clear all
-close all
-
-fp = 'D:\My Files\Work\BGU\datasets\Panas\';
+function ClusteringData = cluster_avalanches(MultiFileAchVecs, SimilarityMat, TestingSet, saveFlg, plotFlg)
 
 params_t = global_params();
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+fileInfo = MultiFileAchVecs{1}(~cellfun(@isempty,{MultiFileAchVecs{1}.is_optimal_tau})).dataInfo.FileInfo;
 
-[fn, fp] = uigetfile([fp '*.mat'], 'Select avalanche similarity matrix file');
-load([fp fn],'MultiFileAchVecs','SimilarityMat','TestingSet');
+if saveFlg
+    output_fp = [fileInfo.base_fp '4 clusters\'];
+    mkdir(output_fp);
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 tic
 
@@ -28,48 +34,54 @@ for iTau = 1:length(SimilarityMat)
         continue;
     end
     
-    ClusteringData(iTau).ClustersFull = [];
-    ClusteringData(iTau).ClustersLen = [];
-    ClusteringData(iTau).ClustersConcatLen = [];
-    ClusteringData(iTau).StatsFull = [];
-    ClusteringData(iTau).StatsLen = [];
-    ClusteringData(iTau).StatsConcatLen = [];
-    ClusteringData(iTau).IdLConcatLen = [];
+    ClusteringData(iTau).Id = [];
+    ClusteringData(iTau).Clusters = [];
+    ClusteringData(iTau).Stats = [];
     ClusteringData(iTau).tau = SimilarityMat(iTau).tau;
+    ClusteringData(iTau).is_optimal_tau = SimilarityMat(iTau).is_optimal_tau;
     
-    fig_name = ['Full Matrix - \tau '  num2str(SimilarityMat(iTau).tau)   '  ' fn];
-    ClusteringData(iTau).ClustersFull = similarity_mat_2_clusters(SimilarityMat(iTau).MatFull, fig_name, params_t, 1);
-    ClusteringData(iTau).StatsFull = clusters_statistics(ClusteringData(iTau).ClustersFull, SimilarityMat(iTau).Id, MultiFileAchVecs, TestingSet(iTau), iTau, fig_name, 1);
-    
+    nofMat = length(SimilarityMat(iTau).Mat);
     concat_max_nof_clusters_Len = 0;
-    for iLen = 1:length(SimilarityMat(iTau).MatLen)
-        fig_name = ['Avalanche Length: ' num2str(iLen) ' \tau '  num2str(SimilarityMat(iTau).tau)   '  ' fn];
-        ClusteringData(iTau).ClustersLen{iLen} = similarity_mat_2_clusters(SimilarityMat(iTau).MatLen{iLen}, fig_name, params_t, 1);
-        ClusteringData(iTau).StatsLen{iLen} = clusters_statistics(ClusteringData(iTau).ClustersLen{iLen}, SimilarityMat(iTau).IdLen{iLen}, MultiFileAchVecs, TestingSet(iTau), iTau, fig_name, 0);
-        concat_max_nof_clusters_Len = max([concat_max_nof_clusters_Len; ClusteringData(iTau).ClustersLen{iLen}]);
+    for iLen = 1:nofMat
+        if iLen < nofMat
+            fig_name = ['Avalanche Length: ' num2str(iLen) ' \tau '  num2str(ClusteringData(iTau).tau)   '  ' fileInfo.orig_fn];
+        else
+            fig_name = ['Full Matrix - \tau '  num2str(ClusteringData(iTau).tau)   '  ' fileInfo.orig_fn];
+        end
+        ClusteringData(iTau).Id{iLen} = SimilarityMat(iTau).Id{iLen};
+        ClusteringData(iTau).Clusters{iLen} = similarity_mat_2_clusters(SimilarityMat(iTau).Mat{iLen}, fig_name, params_t, plotFlg);
+        ClusteringData(iTau).Stats{iLen} = clusters_statistics(ClusteringData(iTau).Clusters{iLen}, ClusteringData(iTau).Id{iLen}, MultiFileAchVecs, TestingSet(iTau), iTau, fig_name, 0);
+        if iLen < nofMat
+            concat_max_nof_clusters_Len = max([concat_max_nof_clusters_Len; ClusteringData(iTau).Clusters{iLen}]);
+        end
     end
     
     concat_cluster_id_prefix_Len = 10^ceil(log10(concat_max_nof_clusters_Len));
-    for iLen = 1:length(SimilarityMat(iTau).MatLen)
-        ClusteringData(iTau).ClustersConcatLen = [ClusteringData(iTau).ClustersConcatLen;  (concat_cluster_id_prefix_Len*iLen)+ClusteringData(iTau).ClustersLen{iLen}];
-        ClusteringData(iTau).IdLConcatLen = [ClusteringData(iTau).IdLConcatLen  SimilarityMat(iTau).IdLen{iLen}];
+    ClusteringData(iTau).Id{nofMat+1} = [];
+    ClusteringData(iTau).Clusters{nofMat+1} = [];    
+    for iLen = 1:nofMat-1
+        ClusteringData(iTau).Clusters{nofMat+1} = [ClusteringData(iTau).Clusters{nofMat+1};  (concat_cluster_id_prefix_Len*iLen)+ClusteringData(iTau).Clusters{iLen}];
+        ClusteringData(iTau).Id{nofMat+1} = [ClusteringData(iTau).Id{nofMat+1}  ClusteringData(iTau).Id{iLen}];
     end
-    fig_name = ['Concatinated Different Length - \tau '  num2str(SimilarityMat(iTau).tau)   '  ' fn];
-    ClusteringData(iTau).StatsConcatLen = clusters_statistics(ClusteringData(iTau).ClustersConcatLen, ClusteringData(iTau).IdLConcatLen, MultiFileAchVecs, TestingSet(iTau), iTau, fig_name, 1);
+    fig_name = ['Concatinated Different Length - \tau '  num2str(ClusteringData(iTau).tau)   '  ' fileInfo.orig_fn];
+    ClusteringData(iTau).Stats{nofMat+1} = clusters_statistics(ClusteringData(iTau).Clusters{nofMat+1}, ClusteringData(iTau).Id{nofMat+1}, MultiFileAchVecs, TestingSet(iTau), iTau, fig_name, plotFlg);
     
 end %for iTau
 
+display(['cluster avalanchhes: ' fileInfo.orig_fn]);
 toc
 
-save([fp fn(1:end-4) '_clusters.mat'],'ClusteringData','MultiFileAchVecs','SimilarityMat','TestingSet');
+if saveFlg
+    save([output_fp fileInfo.orig_fn '_clusters.mat'],'ClusteringData','MultiFileAchVecs','TestingSet');
+end
 
 % tau = 1;  av_len = 3;
-% figure; imagesc(SimilarityMat(tau).MatFull); title(['all avalanches similarity,  \tau =' num2str(SimilarityMat(tau).tau)]);
-% figure; imagesc(SimilarityMat(tau).MatLen{av_len}); title([num2str(av_len) ' bins length avalanches similarity,  \tau =' num2str(SimilarityMat(tau).tau)]);
+% figure; imagesc(SimilarityMat(tau).Mat{end}); title(['all avalanches similarity,  \tau =' num2str(SimilarityMat(tau).tau)]);
+% figure; imagesc(SimilarityMat(tau).Mat{av_len}); title([num2str(av_len) ' bins length avalanches similarity,  \tau =' num2str(SimilarityMat(tau).tau)]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function T_opt = similarity_mat_2_clusters(sim_M, fig_name, params_t, plot_flg)
+function T_opt = similarity_mat_2_clusters(sim_M, fig_name, params_t, plotFlg)
 
 similarity_dist_threshold = 0.5; %for cases when there is same distance all over the matrix
 
@@ -155,7 +167,7 @@ else
     
     T_opt = cluster(cluster_tree,'cutoff',Cutoffs(opt_inx),'criterion','distance');
     
-    if plot_flg
+    if plotFlg
         figure('Name',fig_name);
         subplot(2,2,1);imagesc(sim_M);title('original');colorbar;
         subplot(2,2,3);plot(log10(NofsClusters),Contrasts, log10(NofsClusters(opt_inx)),Contrasts(opt_inx), 'xr');xlabel('log10(nof clusters)');ylabel('contrast');title('Contrast');
@@ -183,7 +195,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %compute statistics based in clustering:  P(cluster), P(conditon), P(cluster|conditon), P(conditon|cluster)
-function Stats = clusters_statistics(Clusters_vec, Id_vec, MultiFileAchVecs, TestingSet, iTau, fig_name, plot_flg)
+function Stats = clusters_statistics(Clusters_vec, Id_vec, MultiFileAchVecs, TestingSet, iTau, fig_name, plotFlg)
 
 nof_ach = length(Id_vec);
 
@@ -199,7 +211,7 @@ for iFile = 1:length(MultiFileAchVecs)
     Stats.P_cond(cond_idx) = Stats.P_cond(cond_idx) + length(MultiFileAchVecs{iFile}(iTau).epochs_vecs) - length(TestingSet.EpochIds{cond_idx});
 end
 Stats.P_cond = Stats.P_cond/sum(Stats.P_cond);
-Stats.P_cond_uni = ones(1,length(MultiFileAchVecs))/length(MultiFileAchVecs); %uniform
+% Stats.P_cond = ones(1,length(MultiFileAchVecs))/length(MultiFileAchVecs); %uniform
 
 clstVScond = zeros(length(Stats.CondIds),max(Clusters_vec));
 for iAch=1:nof_ach
@@ -217,7 +229,7 @@ Stats.P_clst(isnan(Stats.P_clst)) = 0;
 Stats.P_clondGINVclst(isnan(Stats.P_clondGINVclst)) = 0;
 Stats.P_clstGINVcond(isnan(Stats.P_clstGINVcond)) = 0;
 
-if plot_flg
+if plotFlg
     figure('Name',fig_name);
     for i=1:size(clstVScond,1)
         pie_labels = string(1:size(clstVScond,2));

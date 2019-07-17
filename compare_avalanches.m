@@ -117,10 +117,14 @@ function SimilarityMat = calc_similarity_mat(SimilarityMat, MultiFileAchVecs, iT
     if strcmp(similarity_method, 'jaccard') %faster computation
         for iLen = 1:length(SimilarityMat(iTau).Id)-1
             V = [];
-            for m=1:length(SimilarityMat(iTau).Id{iLen})
-                V = [V; MultiFileAchVecs{str2num(SimilarityMat(iTau).Id{iLen}{m}(21:23))}(iTau).epochs_vecs{str2num(SimilarityMat(iTau).Id{iLen}{m}(27:29))}(str2num(SimilarityMat(iTau).Id{iLen}{m}(33:36))).vec];
+            if length(SimilarityMat(iTau).Id{iLen}) == 1
+                SimilarityMat(iTau).Mat{iLen} = 0;
+            else
+                for m=1:length(SimilarityMat(iTau).Id{iLen})
+                    V = [V; MultiFileAchVecs{str2num(SimilarityMat(iTau).Id{iLen}{m}(21:23))}(iTau).epochs_vecs{str2num(SimilarityMat(iTau).Id{iLen}{m}(27:29))}(str2num(SimilarityMat(iTau).Id{iLen}{m}(33:36))).vec];
+                end
+                SimilarityMat(iTau).Mat{iLen} = squareform(1 - pdist(V,'jaccard'), 'tomatrix');
             end
-            SimilarityMat(iTau).Mat{iLen} = squareform(1 - pdist(V,'jaccard'), 'tomatrix');
         end
         nextLen = length(SimilarityMat(iTau).Id);
     end
