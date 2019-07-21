@@ -33,7 +33,8 @@ SimilarityMat = [];
 TestingSet = [];
 
 for iTau = usedTauInfo.tau_idxs
-    tic
+    percent_waitbar = 0;
+    f_waitbar = waitbar(percent_waitbar, ['calc similarity matrix \tau=' num2str(usedTauInfo.tau_vec(iTau)) '   ' num2str(100*percent_waitbar) '%'], 'Name',fileInfo.orig_fn );
     
     %prepare testing and training sets
     TestingSet(iTau).CondIds = {};
@@ -88,7 +89,7 @@ for iTau = usedTauInfo.tau_idxs
         end
     end
     SimilarityMat(iTau).Id{end+1} = AllIds;
-    SimilarityMat = calc_similarity_mat(SimilarityMat, MultiFileAchVecs, iTau, params_t.similarity_method);
+    SimilarityMat = calc_similarity_mat(SimilarityMat, MultiFileAchVecs, iTau, params_t.similarity_method, f_waitbar);
 
     if plotFlg %plot
         figure; 
@@ -96,8 +97,7 @@ for iTau = usedTauInfo.tau_idxs
         subplot(1,2,2); imagesc(SimilarityMat(iTau).Mat{3}); title(['3 bins length avalanches similarity,  \tau =' num2str(SimilarityMat(iTau).tau)]);
     end
 
-    display(['calc similarity matrix: ' fileInfo.orig_fn  ' tau: ' num2str(usedTauInfo.tau_vec(iTau))]);
-    toc
+    close(f_waitbar);
 end %for iTau
 
 if saveFlg
@@ -106,7 +106,7 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function SimilarityMat = calc_similarity_mat(SimilarityMat, MultiFileAchVecs, iTau, similarity_method)
+function SimilarityMat = calc_similarity_mat(SimilarityMat, MultiFileAchVecs, iTau, similarity_method, f_waitbar)
 
 %             fln = str2num(SimilarityMat(iTau).Id{iLen}{m}(21:23));
 %             epc = str2num(SimilarityMat(iTau).Id{iLen}{m}(27:29));
@@ -116,6 +116,8 @@ function SimilarityMat = calc_similarity_mat(SimilarityMat, MultiFileAchVecs, iT
     
     if strcmp(similarity_method, 'jaccard') %faster computation
         for iLen = 1:length(SimilarityMat(iTau).Id)-1
+            percent_waitbar = iLen/length(SimilarityMat(iTau).Id);
+            waitbar(percent_waitbar,f_waitbar,['calc similarity matrix \tau=' num2str(SimilarityMat(iTau).tau) '   ' num2str(100*percent_waitbar) '%']);
             V = [];
             if length(SimilarityMat(iTau).Id{iLen}) == 1
                 SimilarityMat(iTau).Mat{iLen} = 0;
@@ -132,6 +134,8 @@ function SimilarityMat = calc_similarity_mat(SimilarityMat, MultiFileAchVecs, iT
     for iLen = nextLen:length(SimilarityMat(iTau).Id)
         SimilarityMat(iTau).Mat{iLen} = zeros(length(SimilarityMat(iTau).Id{iLen}));
         for m=1:length(SimilarityMat(iTau).Id{iLen})
+            percent_waitbar = (iLen - 1 + m/length(SimilarityMat(iTau).Id{iLen}))/length(SimilarityMat(iTau).Id);
+            waitbar(percent_waitbar,f_waitbar,['calc similarity matrix \tau=' num2str(SimilarityMat(iTau).tau) '   ' num2str(100*percent_waitbar) '%']);
             for n=1:m-1
                 v1 = MultiFileAchVecs{str2num(SimilarityMat(iTau).Id{iLen}{m}(21:23))}(iTau).epochs_vecs{str2num(SimilarityMat(iTau).Id{iLen}{m}(27:29))}(str2num(SimilarityMat(iTau).Id{iLen}{m}(33:36))).vec;
                 v2 = MultiFileAchVecs{str2num(SimilarityMat(iTau).Id{iLen}{n}(21:23))}(iTau).epochs_vecs{str2num(SimilarityMat(iTau).Id{iLen}{n}(27:29))}(str2num(SimilarityMat(iTau).Id{iLen}{n}(33:36))).vec;

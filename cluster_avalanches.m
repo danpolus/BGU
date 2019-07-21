@@ -17,7 +17,8 @@ function ClusteringData = cluster_avalanches(MultiFileAchVecs, SimilarityMat, Te
 
 params_t = global_params();
 
-fileInfo = MultiFileAchVecs{1}(~cellfun(@isempty,{MultiFileAchVecs{1}.is_optimal_tau})).dataInfo.FileInfo;
+optimal_tau_t = MultiFileAchVecs{1}(~cellfun(@isempty,{MultiFileAchVecs{1}.is_optimal_tau}));
+fileInfo = optimal_tau_t(([MultiFileAchVecs{1}.is_optimal_tau] == 1)).dataInfo.FileInfo;
 
 if saveFlg
     output_fp = [fileInfo.base_fp '4 clusters\'];
@@ -26,14 +27,15 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-tic
-
 for iTau = 1:length(SimilarityMat)
     
     if isempty(SimilarityMat(iTau).tau)
         continue;
     end
-    
+
+    percent_waitbar = 0;
+    f_waitbar = waitbar(percent_waitbar, ['cluster avalanches \tau=' num2str(SimilarityMat(iTau).tau) '   ' num2str(100*percent_waitbar) '%'], 'Name',fileInfo.orig_fn );
+      
     ClusteringData(iTau).Id = [];
     ClusteringData(iTau).Clusters = [];
     ClusteringData(iTau).Stats = [];
@@ -43,6 +45,9 @@ for iTau = 1:length(SimilarityMat)
     nofMat = length(SimilarityMat(iTau).Mat);
     concat_max_nof_clusters_Len = 0;
     for iLen = 1:nofMat
+        percent_waitbar = iLen/(nofMat+1);
+        waitbar(percent_waitbar,f_waitbar,['cluster avalanches \tau=' num2str(SimilarityMat(iTau).tau) '   ' num2str(100*percent_waitbar) '%']);
+        
         if iLen < nofMat
             fig_name = ['Avalanche Length: ' num2str(iLen) ' \tau '  num2str(ClusteringData(iTau).tau)   '  ' fileInfo.orig_fn];
         else
@@ -66,10 +71,9 @@ for iTau = 1:length(SimilarityMat)
     fig_name = ['Concatinated Different Length - \tau '  num2str(ClusteringData(iTau).tau)   '  ' fileInfo.orig_fn];
     ClusteringData(iTau).Stats{nofMat+1} = clusters_statistics(ClusteringData(iTau).Clusters{nofMat+1}, ClusteringData(iTau).Id{nofMat+1}, MultiFileAchVecs, TestingSet(iTau), iTau, fig_name, plotFlg);
     
+    close(f_waitbar);
+    
 end %for iTau
-
-display(['cluster avalanchhes: ' fileInfo.orig_fn]);
-toc
 
 if saveFlg
     save([output_fp fileInfo.orig_fn '_clusters.mat'],'ClusteringData','MultiFileAchVecs','TestingSet');

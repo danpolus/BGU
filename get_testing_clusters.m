@@ -15,7 +15,8 @@ function TestingSetClusters = get_testing_clusters(ClusteringData, MultiFileAchV
 
 params_t = global_params();
 
-fileInfo = MultiFileAchVecs{1}(~cellfun(@isempty,{MultiFileAchVecs{1}.is_optimal_tau})).dataInfo.FileInfo;
+optimal_tau_t = MultiFileAchVecs{1}(~cellfun(@isempty,{MultiFileAchVecs{1}.is_optimal_tau}));
+fileInfo = optimal_tau_t(([MultiFileAchVecs{1}.is_optimal_tau] == 1)).dataInfo.FileInfo;
 
 if saveFlg
     output_fp = [fileInfo.base_fp '5 testing\'];
@@ -24,14 +25,15 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-tic
-
 TestingSetClusters = [];
 for iTau = 1:length(ClusteringData)
     
     if isempty(ClusteringData(iTau).tau)
         continue;
     end
+    
+    percent_waitbar = 0;
+    f_waitbar = waitbar(percent_waitbar, ['get testing set clusters \tau=' num2str(TestingSet(iTau).tau) '   ' num2str(100*percent_waitbar) '%'], 'Name',fileInfo.orig_fn );
     
     TestingSetClusters(iTau).CondClst = [];
     TestingSetClusters(iTau).CondIds = TestingSet(iTau).CondIds;
@@ -43,6 +45,9 @@ for iTau = 1:length(ClusteringData)
     for iCond = 1:length(TestingSet(iTau).CondIds)
         %test epochs vectors
         for iEpoch = 1:length(TestingSet(iTau).EpochIds{iCond})
+            percent_waitbar = (iCond - 1 + iEpoch/length(TestingSet(iTau).EpochIds{iCond}))/length(TestingSet(iTau).CondIds);
+            waitbar(percent_waitbar,f_waitbar,['get testing set clusters \tau=' num2str(TestingSet(iTau).tau) '   ' num2str(100*percent_waitbar) '%']);
+            
             %fln = str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(4:6));
             %epc = str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(10:12));
             ach_vectors_t = MultiFileAchVecs{str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(4:6))}(iTau).epochs_vecs{str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(10:12))};
@@ -53,10 +58,8 @@ for iTau = 1:length(ClusteringData)
         end
     end
     
+    close(f_waitbar);
 end
-
-display(['get testing clusters: ' fileInfo.orig_fn]);
-toc
 
 if saveFlg
     save([output_fp fileInfo.orig_fn '_testclust.mat'],'TestingSetClusters','ClusteringData');
