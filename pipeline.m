@@ -42,6 +42,7 @@ parfor iFile = 1:length(files)
 %     load([fp fn],'MultiFileAchVecs','usedTauInfo');
 
     fprintf(fid, '%s    4_compare_avalanches: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});
+    %MultiFileAchVecs = simulate_avalanche_vectors(MultiFileAchVecs, usedTauInfo);
     [SimilarityMat, TestingSet] = compare_avalanches(MultiFileAchVecs, usedTauInfo, 1, 0);
     
 %     %load MultiFileAchVecs, SimilarityMat, TestingSet from mat file   

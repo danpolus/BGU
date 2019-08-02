@@ -83,7 +83,7 @@ for iAvalancheDataSets = 1:length(AvalancheFileDataSets)
         
         AllIds = [];
         for iEpoch = 1:size(all_epochs(iTau).av_raster_epochs,3)
-            AvalancheVectors(iTau).epochs_vecs{iEpoch} = raster2vectors(all_epochs(iTau).av_raster_epochs(:,:,iEpoch), params_t.raster_input_type, convert60to64channels_flg);
+            AvalancheVectors(iTau).epochs_vecs{iEpoch} = raster2vectors(all_epochs(iTau).av_raster_epochs(:,:,iEpoch), params_t, convert60to64channels_flg);
             if ~isempty(AvalancheVectors(iTau).epochs_vecs{iEpoch})
                 avch_length_bins = [AvalancheVectors(iTau).epochs_vecs{iEpoch}.length_bins];
                 for iAvalanche=1:length(avch_length_bins)
@@ -138,19 +138,18 @@ end
 %   avalanche_vecs(i).first_bin_inx - avalanche onset bin index on the timeline
 %   avalanche_vecs(i).length_bins - avalanche duration in bins
 %
-function avalanche_vecs = raster2vectors(raster, raster_input_type, convert60to64channels_flg)
+function avalanche_vecs = raster2vectors(raster, params_t, convert60to64channels_flg)
 
 avalanche_vecs = [];
 
 if convert60to64channels_flg
-    EOG_CHANNELS = [1 10 33 64];
     raster64 = zeros(64,size(raster,2));
     chan_inx = 1:64;
-    chan_inx(EOG_CHANNELS) = [];
+    chan_inx(params_t.EOG_CHANNELS) = [];
     raster64(chan_inx,:) = raster;
     raster = raster64;
 end
-if strcmp(raster_input_type,'binary')
+if strcmp(params_t.raster_input_type,'binary')
     raster = double(raster ~= 0);
 end
 

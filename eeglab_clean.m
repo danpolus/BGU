@@ -14,6 +14,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function EEGSets = eeglab_clean(fp, fn, interpolateBadChannelsFlg, saveFlg, plotFlg)
 
+params_t = global_params();
+
 CHANNEL_LOCATION_FILE = 'D:\My Files\Work\BGU\scripts\Mental-Imagery\electrodes\chanlocs64.sfp';
 CHANNEL_LOCATION_FILE_INTERPOLATE = 'D:\My Files\Work\BGU\scripts\Mental-Imagery\electrodes\chanlocs60.sfp';
 %
@@ -21,7 +23,6 @@ dataset_name = 'eeg_data_wrt_task_rep_no_eog_256Hz_';
 conditions = {'end_trial', 'last_beep'};
 %
 nof_chan = 64;
-EOG_CHANNELS = [1 10 33 64];
 fs = 256;
 %
 LOW_PASS_HZ = 45;
@@ -88,7 +89,7 @@ for iCond = 1:length(conditions)
         EEG.FileInfo = FileInfo;
         
         %remove eog channels
-        EEG = pop_select( EEG,'nochannel', EOG_CHANNELS);
+        EEG = pop_select( EEG,'nochannel', params_t.EOG_CHANNELS);
         
 %         %save berfore cleaning
 %         if saveFlg

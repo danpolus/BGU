@@ -1,5 +1,7 @@
-
+%
 function params_t = global_params()
+
+params_t.EOG_CHANNELS = [1 10 33 64];
 
 params_t.max_tau_sec = 0.04; %maximal tau is 40msec
 params_t.optimal_alpha = -1.5;
@@ -32,4 +34,4 @@ end
 nof_thresh_to_test = 10;
 % params_t.condition_descision_threshold = linspace(0,6,nof_thresh_to_test);  %average-based salience (to chose this method, search 'average-based salience' through project files)
 params_t.condition_descision_threshold = linspace(0.5,1,nof_thresh_to_test);  %contrast-based salience (to chose this method, search 'contrast-based salience' through project files)
-params_t.condition_counter_limit = linspace(1,30,nof_thresh_to_test);
+params_t.condition_counter_limit = round(linspace(1,30,nof_thresh_to_test));
