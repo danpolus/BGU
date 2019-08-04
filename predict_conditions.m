@@ -2,8 +2,9 @@
 %Step 7 : predict_conditions - accumulative Beyesian predictor
 %
 %  inputs:
-% TestingSetClusters - testing set clusters
+% TestClusters - clusters for test
 % ClusteringData - clusters and statistics
+% save_str - add thid sting to filename ('train'/'test') 
 % saveFlg
 % plotFlg
 %
@@ -11,12 +12,12 @@
 % PredictionResults
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function PredictionResults = predict_conditions(TestingSetClusters, ClusteringData, saveFlg, plotFlg)
+function PredictionResults = predict_conditions(TestClusters, ClusteringData, save_str, saveFlg, plotFlg)
 
 params_t = global_params();
 
-optimal_tau_t = TestingSetClusters(~cellfun(@isempty,{TestingSetClusters.is_optimal_tau}));
-fileInfo = optimal_tau_t(([TestingSetClusters.is_optimal_tau] == 1)).fileInfo;
+optimal_tau_t = TestClusters(~cellfun(@isempty,{TestClusters.is_optimal_tau}));
+fileInfo = optimal_tau_t(([TestClusters.is_optimal_tau] == 1)).fileInfo;
 
 if saveFlg
     output_fp = [fileInfo.base_fp '5 testing\'];
@@ -24,22 +25,23 @@ if saveFlg
 end
 
 accumulator_types = {'TotalAccum', 'ThreshAccum', 'EpochAccum', 'SampLimitAccum'};
+debug_len_to_plot = 0;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 PredictionResults = [];
 
-for iTau = 1:length(TestingSetClusters)
-    if isempty(TestingSetClusters(iTau).tau)
+for iTau = 1:length(TestClusters)
+    if isempty(TestClusters(iTau).tau)
         continue;
     end
     
     PredictionResults(iTau).CondPred = [];
-    PredictionResults(iTau).CondIds = TestingSetClusters(iTau).CondIds;
-    PredictionResults(iTau).tau = TestingSetClusters(iTau).tau;
-    PredictionResults(iTau).is_optimal_tau = TestingSetClusters(iTau).is_optimal_tau;
+    PredictionResults(iTau).CondIds = TestClusters(iTau).CondIds;
+    PredictionResults(iTau).tau = TestClusters(iTau).tau;
+    PredictionResults(iTau).is_optimal_tau = TestClusters(iTau).is_optimal_tau;
     PredictionResults(iTau).fileInfo = fileInfo;
     
-    nof_cond = length(TestingSetClusters(iTau).CondIds);
+    nof_cond = length(TestClusters(iTau).CondIds);
     for iCond = 1:nof_cond
         
         %init
@@ -60,17 +62,17 @@ for iTau = 1:length(TestingSetClusters)
         end
         
         %test epochs clusters
-        for iEpoch = 1:length(TestingSetClusters(iTau).CondClst(iCond).EpochClst)
-            nof_epoch_vecs = size(TestingSetClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num,1);
+        for iEpoch = 1:length(TestClusters(iTau).CondClst(iCond).EpochClst)
+            nof_epoch_vecs = size(TestClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num,1);
             for iVec = 1:nof_epoch_vecs
-                avch_length_bins = find(TestingSetClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num(iVec,:));
-                avch_length_bins(TestingSetClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_sim(iVec,avch_length_bins) < params_t.minimal_similarity_threshold) = [];
+                avch_length_bins = find(TestClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num(iVec,:));
+                avch_length_bins(TestClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_sim(iVec,avch_length_bins) < params_t.minimal_similarity_threshold) = [];
                 for iLen = avch_length_bins
                     for iAccum = 1:length(accumulator_types)
                         cond_predictors = PredictionResults(iTau).CondPred{iLen}.(accumulator_types{iAccum});
                         for iThs = 1:size(cond_predictors,2)
-                            cond_predictors(iCond,iThs) = predictor_accumulate(ClusteringData(iTau).Stats{iLen}, TestingSetClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num(iVec,iLen),...
-                                TestingSetClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_sim(iVec,iLen), cond_predictors(iCond,iThs));
+                            cond_predictors(iCond,iThs) = predictor_accumulate(ClusteringData(iTau).Stats{iLen}, TestClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num(iVec,iLen),...
+                                TestClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_sim(iVec,iLen), cond_predictors(iCond,iThs));
                             %next ThreshAccum, SampLimitAccum
                             if strcmp(accumulator_types{iAccum},'ThreshAccum')
                                 cond_predictors(iCond,iThs) = predictor_threshold_decide(ClusteringData(iTau).Stats{iLen}, cond_predictors(iCond,iThs), params_t.condition_descision_threshold(iThs), nof_epoch_vecs);
@@ -87,7 +89,7 @@ for iTau = 1:length(TestingSetClusters)
             %next EpochAccum
             for iLen = 1:length(ClusteringData(iTau).Clusters)
                 PredictionResults(iTau).CondPred{iLen}.EpochAccum(iCond,1) = predictor_decide_last(PredictionResults(iTau).CondPred{iLen}.EpochAccum(iCond,1),[]);
-                if iEpoch < length(TestingSetClusters(iTau).CondClst(iCond).EpochClst)
+                if iEpoch < length(TestClusters(iTau).CondClst(iCond).EpochClst)
                     PredictionResults(iTau).CondPred{iLen}.EpochAccum(iCond,1) = predictor_init_next(ClusteringData(iTau).Stats{iLen}, PredictionResults(iTau).CondPred{iLen}.EpochAccum(iCond,1));
                 end
             end
@@ -101,8 +103,8 @@ for iTau = 1:length(TestingSetClusters)
                     plot_title = ['total, concat, condition: ' num2str(iCond)];
                 elseif iLen == length(ClusteringData(iTau).Clusters)-1
                     plot_title = ['total, full, condition: ' num2str(iCond)];
-                else
-                    %plot_title = ['total, Avalanche Length: ' num2str(iLen,'%d') ' condition: ' num2str(iCond)];
+                elseif iLen == debug_len_to_plot
+                    plot_title = ['total, Avalanche Length: ' num2str(iLen,'%d') ' actual condition: ' num2str(iCond)];
                 end
             end
             PredictionResults(iTau).CondPred{iLen}.TotalAccum(iCond,1) = predictor_decide_last(PredictionResults(iTau).CondPred{iLen}.TotalAccum(iCond,1),plot_title);
@@ -119,8 +121,8 @@ for iTau = 1:length(TestingSetClusters)
                     diplay_predictor_results(PredictionResults(iTau).CondPred{iLen}.(accumulator_types{iAccum}), PredictionResults(iTau).CondIds, params_t, ['concat, ' accumulator_types{iAccum}]);
                 elseif iLen == length(ClusteringData(iTau).Clusters)-1
                     diplay_predictor_results(PredictionResults(iTau).CondPred{iLen}.(accumulator_types{iAccum}), PredictionResults(iTau).CondIds, params_t, ['full, ' accumulator_types{iAccum}]);
-                else
-                    %diplay_predictor_results(PredictionResults(iTau).CondPred{iLen}.(accumulator_types{iAccum}), PredictionResults(iTau).CondIds, params_t, ['full, ' accumulator_types{iAccum}, ' Avalanche Length: ' num2str(iLen,'%d')]);
+                elseif iLen == debug_len_to_plot
+                    diplay_predictor_results(PredictionResults(iTau).CondPred{iLen}.(accumulator_types{iAccum}), PredictionResults(iTau).CondIds, params_t, [accumulator_types{iAccum}, ' Avalanche Length: ' num2str(iLen,'%d')]);
                 end
             end
         end
@@ -129,7 +131,7 @@ for iTau = 1:length(TestingSetClusters)
 end %for iTau
 
 if saveFlg
-    save([output_fp fileInfo.orig_fn '_predict.mat'],'PredictionResults');
+    save([output_fp fileInfo.orig_fn '_' save_str 'Predict.mat'],'PredictionResults');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -153,7 +155,7 @@ function predictor = predictor_accumulate(Stats, cluster_num, cluster_sim, predi
 
 % %test predictor
 % cluster_sim = 1; nof_clust = 4;
-% % TestingSetClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num(iVec) = iCond; % cluster_num = ceil(4*rand); % cluster_num = 3;
+% % TestClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num(iVec) = iCond; % cluster_num = ceil(4*rand); % cluster_num = 3;
 % Stats.P_cond = ones(1,4)/4; % Stats.P_cond = [0.00001 0.99999 0.00001 0.00001];
 % Stats.P_clst = ones(1,nof_clust)/nof_clust; % Stats.P_clst = [0.05 0 0.95 0];
 % Stats.P_clstGINVcond = ones(4,nof_clust)/nof_clust; %Stats.P_clstGINVcond = [1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1];
@@ -220,7 +222,8 @@ if predictor.ach_cnt(end) > 0
     [~,predictor.decision_cond(end)] = max(predictor.conditions_prob_log10(:,end));
 end
 if ~isempty(plot_title)
-    figure;plot(predictor.step_accum');xlabel('step');title(['Accumulators - ' plot_title]);legend('cond 1','cond 2','cond 3','cond 4');
+    figure;plot(cumsum(predictor.step_accum'));xlabel('step');title(['Accumulators - ' plot_title ' predicted condition: ' num2str(predictor.decision_cond(end))]);
+    legend('cond 1','cond 2','cond 3','cond 4', 'cond 5', 'cond 6');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -258,8 +261,7 @@ for iThs = 1:size(cond_predictors,2)
     cond_idx = 1:nof_cond;
     for iCond = 1:nof_cond
         cond_predictors(iCond,iThs).roc.tp = p_det_m(iCond,iCond);
-        normalized_p_cond = Stats.P_cond(cond_idx(cond_idx~=iCond))/sum(Stats.P_cond(cond_idx(cond_idx~=iCond))); %same as divide by (1-Stats.P_cond(iCond,iThs))
-        cond_predictors(iCond,iThs).roc.fa = normalized_p_cond * p_det_m(iCond,cond_idx(cond_idx~=iCond))';
+        cond_predictors(iCond,iThs).roc.fa = 1 - cond_predictors(iCond,iThs).roc.tp;
         
         %fa_total = fa_total + cond_predictors(iCond,iThs).roc.fa *(1-Stats.P_cond(iCond,iThs)); % can be calculated this way as well
         
@@ -295,13 +297,13 @@ end
 ax = [];
 figure('Name',disp_str);
 for iCond = 1:length(CondIds)
-    ax = [ax subplot(3,length(CondIds)+1,(length(CondIds)+1)*0+iCond+1)];scatter(fa(iCond,:),tp(iCond,:),'x');xlabel('fa');ylabel('tp');title([CondIds(iCond) ' - ROC']);
-    ax = [ax subplot(3,length(CondIds)+1,(length(CondIds)+1)*1+iCond+1)];scatter(tp_av_cnt(iCond,:),tp_av_salience(iCond,:),'x');xlabel('cnt');ylabel('salience');title([CondIds(iCond) ' - TP Counter VS Salience']);
-    ax = [ax subplot(3,length(CondIds)+1,(length(CondIds)+1)*2+iCond+1)];scatter(fa_av_cnt(iCond,:),fa_av_salience(iCond,:),'x');xlabel('cnt');ylabel('salience');title([CondIds(iCond) ' - FA Counter VS Salience']);
+    ax = [ax subplot(3,length(CondIds)+1,(length(CondIds)+1)*0+iCond+1)];scatter(fa(iCond,:),tp(iCond,:),'m*');xlabel('fa');ylabel('tp');title([CondIds(iCond) ' - ROC']);xlim([-0.1 1.1]);ylim([-0.1 1.1]);grid on;grid minor;
+    ax = [ax subplot(3,length(CondIds)+1,(length(CondIds)+1)*1+iCond+1)];scatter(tp_av_cnt(iCond,:),tp_av_salience(iCond,:),'m*');xlabel('cnt');ylabel('salience');title([CondIds(iCond) ' - TP Counter VS Salience']);grid on;grid minor;
+    ax = [ax subplot(3,length(CondIds)+1,(length(CondIds)+1)*2+iCond+1)];scatter(fa_av_cnt(iCond,:),fa_av_salience(iCond,:),'m*');xlabel('cnt');ylabel('salience');title([CondIds(iCond) ' - FA Counter VS Salience']);grid on;grid minor;
 end
-ax = [ax subplot(3,length(CondIds)+1,(length(CondIds)+1)*0+1)];scatter(fa_total,tp_total,'x');xlabel('fa');ylabel('tp');title([disp_str ' - Total ROC']);
-ax = [ax subplot(3,length(CondIds)+1,(length(CondIds)+1)*1+1)];scatter(tp_av_cnt_total,tp_av_salience_total,'x');xlabel('cnt');ylabel('salience');title(['Total TP Counter VS Salience']);
-ax = [ax subplot(3,length(CondIds)+1,(length(CondIds)+1)*2+1)];scatter(fa_av_cnt_total,fa_av_salience_total,'x');xlabel('cnt');ylabel('salience');title(['Total FA Counter VS Salience']);
+ax = [ax subplot(3,length(CondIds)+1,(length(CondIds)+1)*0+1)];scatter(fa_total,tp_total,'m*');xlabel('fa');ylabel('tp');title([disp_str ' - Total ROC']);xlim([-0.1 1.1]);ylim([-0.1 1.1]);grid on; grid minor;
+ax = [ax subplot(3,length(CondIds)+1,(length(CondIds)+1)*1+1)];scatter(tp_av_cnt_total,tp_av_salience_total,'m*');xlabel('cnt');ylabel('salience');title('Total TP Counter VS Salience');grid on;grid minor;
+ax = [ax subplot(3,length(CondIds)+1,(length(CondIds)+1)*2+1)];scatter(fa_av_cnt_total,fa_av_salience_total,'m*');xlabel('cnt');ylabel('salience');title('Total FA Counter VS Salience');grid on;grid minor;
 
 for iAx = 1:length(ax)
     x=get(get(ax(iAx),'children'),'Xdata');

@@ -36,13 +36,13 @@ parfor iFile = 1:length(files)
     AvalancheFileDataSets = extract_avalanches(EEGSets, 0);
     fprintf(fid, '%s    3_get_avalanche_vectors: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});
     [MultiFileAchVecs, usedTauInfo] = get_avalanche_vectors(AvalancheFileDataSets, 1);
+%     MultiFileAchVecs = simulate_avalanche_vectors(MultiFileAchVecs, usedTauInfo, 1); %simulate artificial input    
     
 %     %load MultiFileAchVecs and usedTauInfo from mat file   
 %     [fn, fp] = uigetfile([fp '*.mat'], 'Select avalanche vectors file');
 %     load([fp fn],'MultiFileAchVecs','usedTauInfo');
 
     fprintf(fid, '%s    4_compare_avalanches: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});
-    %MultiFileAchVecs = simulate_avalanche_vectors(MultiFileAchVecs, usedTauInfo);
     [SimilarityMat, TestingSet] = compare_avalanches(MultiFileAchVecs, usedTauInfo, 1, 0);
     
 %     %load MultiFileAchVecs, SimilarityMat, TestingSet from mat file   
@@ -51,20 +51,22 @@ parfor iFile = 1:length(files)
 
     fprintf(fid, '%s    5_cluster_avalanches: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});
     ClusteringData = cluster_avalanches(MultiFileAchVecs, SimilarityMat, TestingSet, 1, 0);
+    clear('SimilarityMat'); %save memory
     
 %     %load ClusteringData, MultiFileAchVecs, SimilarityMat, TestingSet from mat file 
 %     [fn, fp] = uigetfile([fp '*.mat'], 'Select clustering results file');
 %     load([fp fn],'ClusteringData','MultiFileAchVecs','TestingSet');
 
     fprintf(fid, '%s    6_get_testing_clusters: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});
-    TestingSetClusters = get_testing_clusters(ClusteringData, MultiFileAchVecs, TestingSet, 1);
-
-%     %load TestingSetClusters, ClusteringData from mat file 
+    [TestingSetClusters, TrainingSetClusters] = get_testing_clusters(ClusteringData, MultiFileAchVecs, TestingSet, 1);
+    
+%     %load TestingSetClusters, TrainingSetClusters, ClusteringData from mat file 
 %     [fn, fp] = uigetfile([fp '*.mat'], 'Select testing clusters file');
-%     load([fp fn],'TestingSetClusters','ClusteringData');
+%     load([fp fn],'TestingSetClusters','TrainingSetClusters','ClusteringData');
 
     fprintf(fid, '%s    7_predict_conditions: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});
-    PredictionResults = predict_conditions(TestingSetClusters, ClusteringData, 1, 0);
+    TestingSetPredictionResults = predict_conditions(TestingSetClusters, ClusteringData, 'test', 1, 0);
+    TrainingSetPredictionResults = predict_conditions(TrainingSetClusters, ClusteringData, 'train', 1, 0);
     
 end
 

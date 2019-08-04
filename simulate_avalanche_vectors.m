@@ -1,5 +1,17 @@
+%
+%prepare artificially simulated vectors and Ids
+%
+%  inputs:
+% MultiFileAchVecs - avalanche vectors 'prototype' 
+% usedTauInfo - used taus info (optimal or others)
+% saveFlg
+%
+%  outputs:
+% SimMultiFileAchVecs - artificially simulated vectors and Ids
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function SimMultiFileAchVecs = simulate_avalanche_vectors(MultiFileAchVecs, usedTauInfo)
+function SimMultiFileAchVecs = simulate_avalanche_vectors(MultiFileAchVecs, usedTauInfo, saveFlg)
 
 max_Len = 3;
 nof_ach_in_epoch = 5*max_Len;
@@ -19,7 +31,6 @@ sim_ach_vec{3}(5,[51:60 91:100 161:170]) = 1;
 sim_ach_vec{3}(6,[51:60 101:110 151:160]) = 1;
 %squareform(1 - pdist(sim_ach_vec{3},'jaccard'), 'tomatrix')
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SimMultiFileAchVecs = [];
@@ -32,6 +43,7 @@ for iFile = 1:length(MultiFileAchVecs)
     SimMultiFileAchVecs{iFile}(iTau).Id = [];
     SimMultiFileAchVecs{iFile}(iTau).Id{max_Len+1} = [];
     SimMultiFileAchVecs{iFile}(iTau).is_optimal_tau = true;   
+    SimMultiFileAchVecs{iFile}(iTau).dataInfo.FileInfo.orig_fn = ['simulation_' SimMultiFileAchVecs{iFile}(iTau).dataInfo.FileInfo.orig_fn];
     
     for iEpoch = 1:length(MultiFileAchVecs{iFile}(iTau).epochs_vecs)
         for iAvalanche = 1:nof_ach_in_epoch
@@ -55,4 +67,11 @@ for iFile = 1:length(MultiFileAchVecs)
         end       
     end
     
+end
+
+if saveFlg
+    MultiFileAchVecs = SimMultiFileAchVecs;
+    output_fp = [SimMultiFileAchVecs{1}(iTau).dataInfo.FileInfo.base_fp '2 avalanches\'];
+    mkdir(output_fp);
+    save([output_fp SimMultiFileAchVecs{1}(iTau).dataInfo.FileInfo.orig_fn '_avalanches.mat'],'MultiFileAchVecs','usedTauInfo');
 end

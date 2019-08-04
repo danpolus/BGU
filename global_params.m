@@ -2,6 +2,7 @@
 function params_t = global_params()
 
 params_t.EOG_CHANNELS = [1 10 33 64];
+params_t.max_nof_epochs = 100;
 
 params_t.max_tau_sec = 0.04; %maximal tau is 40msec
 params_t.optimal_alpha = -1.5;
@@ -16,7 +17,7 @@ params_t.raster_input_type = 'binary'; % 'binary' 'events_cnt' 'amplitude' -> se
 params_t.similarity_method = 'jaccard'; % 'jaccard' 'correlation' 'levenshtein'  -> set to appear in folder name as well
 params_t.taus_to_use = 'optimal_multi_files'; %'all' 'optimal_per_file' 'optimal_multi_files'
 
-params_t.test_set_percent = 0.1;
+params_t.test_set_percent = 0.1; % 10% for 4 conditions, 15% for 6 conditions (3/2 ratio)
 
 params_t.reasonable_nof_clusters = 100;
 params_t.max_nof_clusters = Inf; % 15 Inf

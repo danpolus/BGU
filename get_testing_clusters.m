@@ -1,5 +1,5 @@
 %
-%Step 6 : get_testing_clusters - find clusters for testing set vectors
+%Step 6 : get_testing_clusters - find clusters for training and testing set vectors
 %
 %  inputs:
 % ClusteringData - clusters and statistics
@@ -9,9 +9,10 @@
 %
 %  outputs:
 % TestingSetClusters - testing set clusters
+% TrainingSetClusters - training set clusters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function TestingSetClusters = get_testing_clusters(ClusteringData, MultiFileAchVecs, TestingSet, saveFlg)
+function [TestingSetClusters, TrainingSetClusters] = get_testing_clusters(ClusteringData, MultiFileAchVecs, TestingSet, saveFlg)
 
 params_t = global_params();
 
@@ -26,6 +27,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 TestingSetClusters = [];
+TrainingSetClusters = [];
 for iTau = 1:length(ClusteringData)
     
     if isempty(ClusteringData(iTau).tau)
@@ -35,6 +37,7 @@ for iTau = 1:length(ClusteringData)
     percent_waitbar = 0;
     f_waitbar = waitbar(percent_waitbar, ['get testing set clusters \tau=' num2str(TestingSet(iTau).tau) '   ' num2str(100*percent_waitbar) '%'], 'Name',fileInfo.orig_fn );
     
+    %testing set
     TestingSetClusters(iTau).CondClst = [];
     TestingSetClusters(iTau).CondIds = TestingSet(iTau).CondIds;
     TestingSetClusters(iTau).tau = TestingSet(iTau).tau;
@@ -42,19 +45,56 @@ for iTau = 1:length(ClusteringData)
     TestingSetClusters(iTau).fileInfo.base_fp = fileInfo.base_fp;
     TestingSetClusters(iTau).fileInfo.orig_fn = fileInfo.orig_fn;
     
+    testEpochMat = zeros(length(TestingSetClusters(iTau).CondIds),params_t.max_nof_epochs);
     for iCond = 1:length(TestingSet(iTau).CondIds)
         %test epochs vectors
         for iEpoch = 1:length(TestingSet(iTau).EpochIds{iCond})
             percent_waitbar = (iCond - 1 + iEpoch/length(TestingSet(iTau).EpochIds{iCond}))/length(TestingSet(iTau).CondIds);
             waitbar(percent_waitbar,f_waitbar,['get testing set clusters \tau=' num2str(TestingSet(iTau).tau) '   ' num2str(100*percent_waitbar) '%']);
             
-            %fln = str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(4:6));
-            %epc = str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(10:12));
-            ach_vectors_t = MultiFileAchVecs{str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(4:6))}(iTau).epochs_vecs{str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(10:12))};
+            fln = str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(4:6));
+            epc = str2num(TestingSet(iTau).EpochIds{iCond}{iEpoch}(10:12));
+            ach_vectors_t = MultiFileAchVecs{fln}(iTau).epochs_vecs{epc};
             for iVec = 1:length(ach_vectors_t)
                 [TestingSetClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num(iVec,:), TestingSetClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_sim(iVec,:)] = ...
                     find_vector_cluster(ach_vectors_t(iVec).vec, ach_vectors_t(iVec).length_bins, MultiFileAchVecs, ClusteringData, params_t.similarity_method, iTau, 0);
             end
+            testEpochMat(fln,epc) = 1;
+        end
+    end
+    
+    %traning set
+    TrainingSetClusters(iTau).CondClst = [];
+    TrainingSetClusters(iTau).CondIds = TestingSet(iTau).CondIds;
+    TrainingSetClusters(iTau).tau = TestingSet(iTau).tau;
+    TrainingSetClusters(iTau).is_optimal_tau = TestingSet(iTau).is_optimal_tau;
+    TrainingSetClusters(iTau).fileInfo.base_fp = fileInfo.base_fp;
+    TrainingSetClusters(iTau).fileInfo.orig_fn = fileInfo.orig_fn;
+    
+    nofLen = length(ClusteringData(iTau).Clusters);
+    iFullEpoch = zeros(1,length(TrainingSetClusters(iTau).CondIds));
+    for iFile = 1:length(MultiFileAchVecs)
+        cond_idx = find(contains(TrainingSetClusters(iTau).CondIds, MultiFileAchVecs{iFile}(iTau).file_id(1:17)));        
+        for iEpoch = randperm(length(MultiFileAchVecs{iFile}(iTau).epochs_vecs))
+            if testEpochMat(iFile,iEpoch) == 1 || isempty(MultiFileAchVecs{iFile}(iTau).epochs_vecs{iEpoch})
+                continue;
+            end
+            iFullEpoch(cond_idx) = iFullEpoch(cond_idx) + 1;
+            avch_length_bins = [MultiFileAchVecs{iFile}(iTau).epochs_vecs{iEpoch}.length_bins];
+            for iAvalanche=1:length(avch_length_bins)
+                id = [MultiFileAchVecs{iFile}(iTau).file_id 'epc' num2str(iEpoch,'%03d') 'ach' num2str(iAvalanche,'%04d')];
+                cluster_num = zeros(1,nofLen);
+                cluster_sim = zeros(1,nofLen);                
+                ach_idx = contains(ClusteringData(iTau).Id{avch_length_bins(iAvalanche)}, id);
+                cluster_num(avch_length_bins(iAvalanche)) = ClusteringData(iTau).Clusters{avch_length_bins(iAvalanche)}(ach_idx);
+                ach_idx = contains(ClusteringData(iTau).Id{end-1}, id);
+                cluster_num(nofLen-1) = ClusteringData(iTau).Clusters{nofLen-1}(ach_idx);
+                ach_idx = contains(ClusteringData(iTau).Id{nofLen}, id);
+                cluster_num(nofLen) = ClusteringData(iTau).Clusters{nofLen}(ach_idx);
+                cluster_sim(cluster_num > 0) = 1;  
+                TrainingSetClusters(iTau).CondClst(cond_idx).EpochClst(iFullEpoch(cond_idx)).cluster_num(iAvalanche,:) = cluster_num;
+                TrainingSetClusters(iTau).CondClst(cond_idx).EpochClst(iFullEpoch(cond_idx)).cluster_sim(iAvalanche,:) = cluster_sim;
+            end         
         end
     end
     
@@ -62,7 +102,7 @@ for iTau = 1:length(ClusteringData)
 end
 
 if saveFlg
-    save([output_fp fileInfo.orig_fn '_testclust.mat'],'TestingSetClusters','ClusteringData');
+    save([output_fp fileInfo.orig_fn '_testclust.mat'],'TestingSetClusters','TrainingSetClusters','ClusteringData');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
