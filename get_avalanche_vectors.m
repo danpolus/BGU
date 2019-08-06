@@ -87,7 +87,8 @@ for iAvalancheDataSets = 1:length(AvalancheFileDataSets)
             if ~isempty(AvalancheVectors(iTau).epochs_vecs{iEpoch})
                 avch_length_bins = [AvalancheVectors(iTau).epochs_vecs{iEpoch}.length_bins];
                 for iAvalanche=1:length(avch_length_bins)
-                    AllIds = [AllIds {[file_id 'epc' num2str(iEpoch,'%03d') 'ach' num2str(iAvalanche,'%04d')]}];
+                    AvalancheVectors(iTau).epochs_vecs{iEpoch}(iAvalanche).id = [file_id 'epc' num2str(iEpoch,'%03d') 'ach' num2str(iAvalanche,'%04d')];
+                    AllIds = [AllIds {AvalancheVectors(iTau).epochs_vecs{iEpoch}(iAvalanche).id}];
                 end  
                 if length(AvalancheVectors(iTau).Id) < max(avch_length_bins) %alocate indexes for new avalanche length
                     AvalancheVectors(iTau).Id{max(avch_length_bins)} = [];
@@ -95,7 +96,7 @@ for iAvalancheDataSets = 1:length(AvalancheFileDataSets)
                 for iLen = unique(avch_length_bins)
                     same_len_idx = find(avch_length_bins == iLen);
                     for iAvalanche = same_len_idx
-                        AvalancheVectors(iTau).Id{iLen} = [AvalancheVectors(iTau).Id{iLen} {[file_id 'epc' num2str(iEpoch,'%03d') 'ach' num2str(iAvalanche,'%04d')]}];
+                        AvalancheVectors(iTau).Id{iLen} = [AvalancheVectors(iTau).Id{iLen} {AvalancheVectors(iTau).epochs_vecs{iEpoch}(iAvalanche).id}];
                     end
                 end              
             end

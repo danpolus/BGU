@@ -61,9 +61,10 @@ for iFile = 1:length(MultiFileAchVecs)
             SimMultiFileAchVecs{iFile}(iTau).epochs_vecs{iEpoch}(iAvalanche).vec = sim_ach_vec{iLen}(cond_idx,:);
             SimMultiFileAchVecs{iFile}(iTau).epochs_vecs{iEpoch}(iAvalanche).first_bin_inx = iAvalanche;
             SimMultiFileAchVecs{iFile}(iTau).epochs_vecs{iEpoch}(iAvalanche).length_bins = iLen;
+            SimMultiFileAchVecs{iFile}(iTau).epochs_vecs{iEpoch}(iAvalanche).id = [MultiFileAchVecs{iFile}(iTau).file_id 'epc' num2str(iEpoch,'%03d') 'ach' num2str(iAvalanche,'%04d')];
             
-            SimMultiFileAchVecs{iFile}(iTau).Id{iLen} = [SimMultiFileAchVecs{iFile}(iTau).Id{iLen} {[MultiFileAchVecs{iFile}(iTau).file_id 'epc' num2str(iEpoch,'%03d') 'ach' num2str(iAvalanche,'%04d')]}];
-            SimMultiFileAchVecs{iFile}(iTau).Id{max_Len+1} = [SimMultiFileAchVecs{iFile}(iTau).Id{max_Len+1} {[MultiFileAchVecs{iFile}(iTau).file_id 'epc' num2str(iEpoch,'%03d') 'ach' num2str(iAvalanche,'%04d')]}];
+            SimMultiFileAchVecs{iFile}(iTau).Id{iLen} = [SimMultiFileAchVecs{iFile}(iTau).Id{iLen} {SimMultiFileAchVecs{iFile}(iTau).epochs_vecs{iEpoch}(iAvalanche).id}];
+            SimMultiFileAchVecs{iFile}(iTau).Id{max_Len+1} = [SimMultiFileAchVecs{iFile}(iTau).Id{max_Len+1} {SimMultiFileAchVecs{iFile}(iTau).epochs_vecs{iEpoch}(iAvalanche).id}];
         end       
     end
     

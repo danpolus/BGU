@@ -1,23 +1,24 @@
 %
-%Step 7 : predict_conditions - accumulative Beyesian predictor
+%Step 8 : predict_conditions - accumulative Beyesian predictor
 %
 %  inputs:
-% TestClusters - clusters for test
-% ClusteringData - clusters and statistics
-% save_str - add thid sting to filename ('train'/'test') 
+% TestClusterSets - clusters for test
+% ClusteringDataSets - clusters and statistics
+% save_str - add this sting to filename
 % saveFlg
 % plotFlg
 %
 %  outputs:
-% PredictionResults
+% PredictionResultSets
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function PredictionResults = predict_conditions(TestClusters, ClusteringData, save_str, saveFlg, plotFlg)
+
+function PredictionResultSets = predict_conditions(TestClusterSets, ClusteringDataSets, save_str, saveFlg, plotFlg)
 
 params_t = global_params();
 
-optimal_tau_t = TestClusters(~cellfun(@isempty,{TestClusters.is_optimal_tau}));
-fileInfo = optimal_tau_t(([TestClusters.is_optimal_tau] == 1)).fileInfo;
+optimal_tau_t = TestClusterSets{1}(~cellfun(@isempty,{TestClusterSets{1}.is_optimal_tau}));
+fileInfo = optimal_tau_t(([TestClusterSets{1}.is_optimal_tau] == 1)).fileInfo;
 
 if saveFlg
     output_fp = [fileInfo.base_fp '5 testing\'];
@@ -28,110 +29,120 @@ accumulator_types = {'TotalAccum', 'ThreshAccum', 'EpochAccum', 'SampLimitAccum'
 debug_len_to_plot = 0;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-PredictionResults = [];
+PredictionResultSets = [];
 
-for iTau = 1:length(TestClusters)
-    if isempty(TestClusters(iTau).tau)
-        continue;
-    end
-    
-    PredictionResults(iTau).CondPred = [];
-    PredictionResults(iTau).CondIds = TestClusters(iTau).CondIds;
-    PredictionResults(iTau).tau = TestClusters(iTau).tau;
-    PredictionResults(iTau).is_optimal_tau = TestClusters(iTau).is_optimal_tau;
-    PredictionResults(iTau).fileInfo = fileInfo;
-    
-    nof_cond = length(TestClusters(iTau).CondIds);
-    for iCond = 1:nof_cond
-        
-        %init
-        for iLen = 1:length(ClusteringData(iTau).Clusters)
-            for iAccum = 1:length(accumulator_types)
-                switch accumulator_types{iAccum}
-                    case 'ThreshAccum'
-                        nof_ths = length(params_t.condition_descision_threshold);
-                    case 'SampLimitAccum'
-                        nof_ths = length(params_t.condition_counter_limit);
-                    otherwise
-                        nof_ths = 1;
-                end
-                for iThs = 1:nof_ths
-                    PredictionResults(iTau).CondPred{iLen}.(accumulator_types{iAccum})(iCond,iThs) =  predictor_init_next(ClusteringData(iTau).Stats{iLen}, []);
-                end
-            end
+percent_waitbar = 0;
+f_waitbar = waitbar(percent_waitbar, ['predict conditions ' num2str(100*percent_waitbar) '%'], 'Name',fileInfo.orig_fn );   
+
+for iCrossValid = 1:length(TestClusterSets)
+    for iTau = 1:length(TestClusterSets{iCrossValid})
+        if isempty(TestClusterSets{iCrossValid}(iTau).tau)
+            continue;
         end
         
-        %test epochs clusters
-        for iEpoch = 1:length(TestClusters(iTau).CondClst(iCond).EpochClst)
-            nof_epoch_vecs = size(TestClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num,1);
-            for iVec = 1:nof_epoch_vecs
-                avch_length_bins = find(TestClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num(iVec,:));
-                avch_length_bins(TestClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_sim(iVec,avch_length_bins) < params_t.minimal_similarity_threshold) = [];
-                for iLen = avch_length_bins
-                    for iAccum = 1:length(accumulator_types)
-                        cond_predictors = PredictionResults(iTau).CondPred{iLen}.(accumulator_types{iAccum});
-                        for iThs = 1:size(cond_predictors,2)
-                            cond_predictors(iCond,iThs) = predictor_accumulate(ClusteringData(iTau).Stats{iLen}, TestClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num(iVec,iLen),...
-                                TestClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_sim(iVec,iLen), cond_predictors(iCond,iThs));
-                            %next ThreshAccum, SampLimitAccum
-                            if strcmp(accumulator_types{iAccum},'ThreshAccum')
-                                cond_predictors(iCond,iThs) = predictor_threshold_decide(ClusteringData(iTau).Stats{iLen}, cond_predictors(iCond,iThs), params_t.condition_descision_threshold(iThs), nof_epoch_vecs);
-                            end
-                            if strcmp(accumulator_types{iAccum},'SampLimitAccum')
-                                cond_predictors(iCond,iThs) = predictor_counter_decide(ClusteringData(iTau).Stats{iLen}, cond_predictors(iCond,iThs), params_t.condition_counter_limit(iThs));
-                            end
-                        end
-                        PredictionResults(iTau).CondPred{iLen}.(accumulator_types{iAccum}) = cond_predictors;
+        percent_waitbar = iCrossValid/length(TestClusterSets);
+        waitbar(percent_waitbar,f_waitbar,['cross-valid ' num2str(iCrossValid) ' predict conditions  ' num2str(100*percent_waitbar) '%']);  
+        
+        PredictionResultSets{iCrossValid}(iTau).CondPred = [];
+        PredictionResultSets{iCrossValid}(iTau).CondIds = TestClusterSets{iCrossValid}(iTau).CondIds;
+        PredictionResultSets{iCrossValid}(iTau).tau = TestClusterSets{iCrossValid}(iTau).tau;
+        PredictionResultSets{iCrossValid}(iTau).is_optimal_tau = TestClusterSets{iCrossValid}(iTau).is_optimal_tau;
+        PredictionResultSets{iCrossValid}(iTau).fileInfo = fileInfo;
+        
+        nof_cond = length(TestClusterSets{iCrossValid}(iTau).CondIds);
+        for iCond = 1:nof_cond
+            
+            %init
+            for iLen = 1:length(ClusteringDataSets{iCrossValid}(iTau).Clusters)
+                for iAccum = 1:length(accumulator_types)
+                    switch accumulator_types{iAccum}
+                        case 'ThreshAccum'
+                            nof_ths = length(params_t.condition_descision_threshold);
+                        case 'SampLimitAccum'
+                            nof_ths = length(params_t.condition_counter_limit);
+                        otherwise
+                            nof_ths = 1;
+                    end
+                    for iThs = 1:nof_ths
+                        PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.(accumulator_types{iAccum})(iCond,iThs) =  predictor_init_next(ClusteringDataSets{iCrossValid}(iTau).Stats{iLen}, []);
                     end
                 end
-            end %for iVec
+            end
             
-            %next EpochAccum
-            for iLen = 1:length(ClusteringData(iTau).Clusters)
-                PredictionResults(iTau).CondPred{iLen}.EpochAccum(iCond,1) = predictor_decide_last(PredictionResults(iTau).CondPred{iLen}.EpochAccum(iCond,1),[]);
-                if iEpoch < length(TestClusters(iTau).CondClst(iCond).EpochClst)
-                    PredictionResults(iTau).CondPred{iLen}.EpochAccum(iCond,1) = predictor_init_next(ClusteringData(iTau).Stats{iLen}, PredictionResults(iTau).CondPred{iLen}.EpochAccum(iCond,1));
+            %test epochs clusters
+            for iEpoch = 1:length(TestClusterSets{iCrossValid}(iTau).CondClst(iCond).EpochClst)
+                nof_epoch_vecs = size(TestClusterSets{iCrossValid}(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num,1);
+                for iVec = 1:nof_epoch_vecs
+                    avch_length_bins = find(TestClusterSets{iCrossValid}(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num(iVec,:));
+                    avch_length_bins(TestClusterSets{iCrossValid}(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_sim(iVec,avch_length_bins) < params_t.minimal_similarity_threshold) = [];
+                    for iLen = avch_length_bins
+                        for iAccum = 1:length(accumulator_types)
+                            cond_predictors = PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.(accumulator_types{iAccum});
+                            for iThs = 1:size(cond_predictors,2)
+                                cond_predictors(iCond,iThs) = predictor_accumulate(ClusteringDataSets{iCrossValid}(iTau).Stats{iLen}, TestClusterSets{iCrossValid}(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num(iVec,iLen),...
+                                    TestClusterSets{iCrossValid}(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_sim(iVec,iLen), cond_predictors(iCond,iThs));
+                                %next ThreshAccum, SampLimitAccum
+                                if strcmp(accumulator_types{iAccum},'ThreshAccum')
+                                    cond_predictors(iCond,iThs) = predictor_threshold_decide(ClusteringDataSets{iCrossValid}(iTau).Stats{iLen}, cond_predictors(iCond,iThs), params_t.condition_descision_threshold(iThs), nof_epoch_vecs);
+                                end
+                                if strcmp(accumulator_types{iAccum},'SampLimitAccum')
+                                    cond_predictors(iCond,iThs) = predictor_counter_decide(ClusteringDataSets{iCrossValid}(iTau).Stats{iLen}, cond_predictors(iCond,iThs), params_t.condition_counter_limit(iThs));
+                                end
+                            end
+                            PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.(accumulator_types{iAccum}) = cond_predictors;
+                        end
+                    end
+                end %for iVec
+                
+                %next EpochAccum
+                for iLen = 1:length(ClusteringDataSets{iCrossValid}(iTau).Clusters)
+                    PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.EpochAccum(iCond,1) = predictor_decide_last(PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.EpochAccum(iCond,1),[]);
+                    if iEpoch < length(TestClusterSets{iCrossValid}(iTau).CondClst(iCond).EpochClst)
+                        PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.EpochAccum(iCond,1) = predictor_init_next(ClusteringDataSets{iCrossValid}(iTau).Stats{iLen}, PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.EpochAccum(iCond,1));
+                    end
                 end
+            end %for iEpoch
+            
+            %decide TotalAccum
+            for iLen = 1:length(ClusteringDataSets{iCrossValid}(iTau).Clusters)
+                plot_title = [];
+                if plotFlg
+                    if iLen == length(ClusteringDataSets{iCrossValid}(iTau).Clusters)
+                        plot_title = ['total, concat, condition: ' num2str(iCond)];
+                    elseif iLen == length(ClusteringDataSets{iCrossValid}(iTau).Clusters)-1
+                        plot_title = ['total, full, condition: ' num2str(iCond)];
+                    elseif iLen == debug_len_to_plot
+                        plot_title = ['total, Avalanche Length: ' num2str(iLen,'%d') ' actual condition: ' num2str(iCond)];
+                    end
+                end
+                PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.TotalAccum(iCond,1) = predictor_decide_last(PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.TotalAccum(iCond,1),plot_title);
             end
-        end %for iEpoch
+            
+        end %for iCond
         
-        %decide TotalAccum
-        for iLen = 1:length(ClusteringData(iTau).Clusters)
-            plot_title = [];
-            if plotFlg
-                if iLen == length(ClusteringData(iTau).Clusters)
-                    plot_title = ['total, concat, condition: ' num2str(iCond)];
-                elseif iLen == length(ClusteringData(iTau).Clusters)-1
-                    plot_title = ['total, full, condition: ' num2str(iCond)];
-                elseif iLen == debug_len_to_plot
-                    plot_title = ['total, Avalanche Length: ' num2str(iLen,'%d') ' actual condition: ' num2str(iCond)];
+        %ROC & display
+        for iLen = 1:length(ClusteringDataSets{iCrossValid}(iTau).Clusters)
+            for iAccum = 1:length(accumulator_types)
+                PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.(accumulator_types{iAccum}) = calc_predictor_performance(PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.(accumulator_types{iAccum}), ClusteringDataSets{iCrossValid}(iTau).Stats{iLen});
+                if plotFlg
+                    if iLen == length(ClusteringDataSets{iCrossValid}(iTau).Clusters)
+                        diplay_predictor_results(PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.(accumulator_types{iAccum}), PredictionResultSets{iCrossValid}(iTau).CondIds, params_t, ['concat, ' accumulator_types{iAccum}]);
+                    elseif iLen == length(ClusteringDataSets{iCrossValid}(iTau).Clusters)-1
+                        diplay_predictor_results(PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.(accumulator_types{iAccum}), PredictionResultSets{iCrossValid}(iTau).CondIds, params_t, ['full, ' accumulator_types{iAccum}]);
+                    elseif iLen == debug_len_to_plot
+                        diplay_predictor_results(PredictionResultSets{iCrossValid}(iTau).CondPred{iLen}.(accumulator_types{iAccum}), PredictionResultSets{iCrossValid}(iTau).CondIds, params_t, [accumulator_types{iAccum}, ' Avalanche Length: ' num2str(iLen,'%d')]);
+                    end
                 end
             end
-            PredictionResults(iTau).CondPred{iLen}.TotalAccum(iCond,1) = predictor_decide_last(PredictionResults(iTau).CondPred{iLen}.TotalAccum(iCond,1),plot_title);
         end
         
-    end %for iCond
-    
-    %ROC & display
-    for iLen = 1:length(ClusteringData(iTau).Clusters)
-        for iAccum = 1:length(accumulator_types)
-            PredictionResults(iTau).CondPred{iLen}.(accumulator_types{iAccum}) = calc_predictor_performance(PredictionResults(iTau).CondPred{iLen}.(accumulator_types{iAccum}), ClusteringData(iTau).Stats{iLen});
-            if plotFlg
-                if iLen == length(ClusteringData(iTau).Clusters)
-                    diplay_predictor_results(PredictionResults(iTau).CondPred{iLen}.(accumulator_types{iAccum}), PredictionResults(iTau).CondIds, params_t, ['concat, ' accumulator_types{iAccum}]);
-                elseif iLen == length(ClusteringData(iTau).Clusters)-1
-                    diplay_predictor_results(PredictionResults(iTau).CondPred{iLen}.(accumulator_types{iAccum}), PredictionResults(iTau).CondIds, params_t, ['full, ' accumulator_types{iAccum}]);
-                elseif iLen == debug_len_to_plot
-                    diplay_predictor_results(PredictionResults(iTau).CondPred{iLen}.(accumulator_types{iAccum}), PredictionResults(iTau).CondIds, params_t, [accumulator_types{iAccum}, ' Avalanche Length: ' num2str(iLen,'%d')]);
-                end
-            end
-        end
-    end
-    
-end %for iTau
+    end %for iTau
+end %for iCrossValid
+
+close(f_waitbar);
 
 if saveFlg
-    save([output_fp fileInfo.orig_fn '_' save_str 'Predict.mat'],'PredictionResults');
+    save([output_fp fileInfo.orig_fn '_' save_str 'Predict.mat'],'PredictionResultSets','ClusteringDataSets');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -155,7 +166,7 @@ function predictor = predictor_accumulate(Stats, cluster_num, cluster_sim, predi
 
 % %test predictor
 % cluster_sim = 1; nof_clust = 4;
-% % TestClusters(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num(iVec) = iCond; % cluster_num = ceil(4*rand); % cluster_num = 3;
+% % TestClusterSets{iCrossValid}(iTau).CondClst(iCond).EpochClst(iEpoch).cluster_num(iVec) = iCond; % cluster_num = ceil(4*rand); % cluster_num = 3;
 % Stats.P_cond = ones(1,4)/4; % Stats.P_cond = [0.00001 0.99999 0.00001 0.00001];
 % Stats.P_clst = ones(1,nof_clust)/nof_clust; % Stats.P_clst = [0.05 0 0.95 0];
 % Stats.P_clstGINVcond = ones(4,nof_clust)/nof_clust; %Stats.P_clstGINVcond = [1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1];

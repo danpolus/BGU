@@ -1,5 +1,5 @@
 %
-%Step 4 : compare_avalanches - split to training and testing sets; generate similarity matrix
+%Step 4 : compare_avalanches - generate similarity matrix
 %
 %  inputs:
 % MultiFileAchVecs - avalanche vectors from all sets
@@ -9,10 +9,9 @@
 %
 %  outputs:
 % SimilarityMat - similarity between avalanches distances matrix
-% TestingSet - avalanches (epochs) for testing
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [SimilarityMat, TestingSet] = compare_avalanches(MultiFileAchVecs, usedTauInfo, saveFlg, plotFlg)
+function SimilarityMat = compare_avalanches(MultiFileAchVecs, usedTauInfo, saveFlg, plotFlg)
 
 params_t = global_params();
 
@@ -30,43 +29,11 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 SimilarityMat = [];
-TestingSet = [];
 
 for iTau = usedTauInfo.tau_idxs
     percent_waitbar = 0;
     f_waitbar = waitbar(percent_waitbar, ['calc similarity matrix \tau=' num2str(usedTauInfo.tau_vec(iTau)) '   ' num2str(100*percent_waitbar) '%'], 'Name',fileInfo.orig_fn );
-    
-    %prepare testing and training sets
-    TestingSet(iTau).CondIds = {};
-    TestingSet(iTau).AchIds = [];
-    TestingSet(iTau).EpochIds = [];
-    TestingSet(iTau).tau = usedTauInfo.tau_vec(iTau);
-    TestingSet(iTau).is_optimal_tau = iTau == usedTauInfo.multi_files_tau_optimal_idx;
-    ConditionsAchIds = {};
-    ConditionsEpochIds = {};
-    for iFile = 1:length(MultiFileAchVecs)
-        cond_idx = find(contains(TestingSet(iTau).CondIds, MultiFileAchVecs{iFile}(iTau).file_id(1:17)));
-        if isempty(cond_idx)
-            TestingSet(iTau).CondIds = [TestingSet(iTau).CondIds {MultiFileAchVecs{iFile}(iTau).file_id(1:17)}];
-            cond_idx = length(TestingSet(iTau).CondIds);
-            ConditionsAchIds{cond_idx} = [];
-            ConditionsEpochIds{cond_idx} = [];
-        end
-        ConditionsAchIds{cond_idx} = [ConditionsAchIds{cond_idx} MultiFileAchVecs{iFile}(iTau).Id{end}];
-        for iEpoch=1:length(MultiFileAchVecs{iFile}(iTau).epochs_vecs)
-            ConditionsEpochIds{cond_idx} = [ConditionsEpochIds{cond_idx} {[MultiFileAchVecs{iFile}(iTau).file_id(18:end) 'epc' num2str(iEpoch,'%03d')]}];
-        end
-    end
-    
-    for cond_idx=1:length(TestingSet(iTau).CondIds)
-        test_epochs_inx = randperm(length(ConditionsEpochIds{cond_idx}), round(length(ConditionsEpochIds{cond_idx})*params_t.test_set_percent));
-        TestingSet(iTau).EpochIds{cond_idx} = ConditionsEpochIds{cond_idx}(test_epochs_inx);
-        test_ach_inx = contains(ConditionsAchIds{cond_idx},TestingSet(iTau).EpochIds{cond_idx});
-        TestingSet(iTau).AchIds{cond_idx} = ConditionsAchIds{cond_idx}(test_ach_inx);
-        ConditionsAchIds{cond_idx}(test_ach_inx) = [];
-    end
-
-    
+     
     %compute similarity matrix   
     SimilarityMat(iTau).Mat = [];
     SimilarityMat(iTau).Id = [];
@@ -74,17 +41,14 @@ for iTau = usedTauInfo.tau_idxs
     SimilarityMat(iTau).is_optimal_tau = iTau == usedTauInfo.multi_files_tau_optimal_idx;
     AllIds = [];
     for iFile = 1:length(MultiFileAchVecs)
-        cond_idx = find(contains(TestingSet(iTau).CondIds, MultiFileAchVecs{iFile}(iTau).file_id(1:17)));
-        AllIds = [AllIds  ConditionsAchIds{cond_idx}];
-        
+        AllIds = [AllIds  MultiFileAchVecs{iFile}(iTau).Id{end}];
         max_avch_length_bins = length(MultiFileAchVecs{iFile}(iTau).Id)-1; %last one is all avalanche matrix
+        if length(SimilarityMat(iTau).Id ) < max_avch_length_bins %alocate indexes for new avalanche length
+            SimilarityMat(iTau).Id{max_avch_length_bins} = [];
+        end
         for iLen = 1:max_avch_length_bins
-            if length(SimilarityMat(iTau).Id ) < max_avch_length_bins %alocate indexes for new avalanche length
-                SimilarityMat(iTau).Id{max_avch_length_bins} = [];
-            end
             if ~isempty(MultiFileAchVecs{iFile}(iTau).Id{iLen})
-                train_samples_inx_Len = contains(ConditionsAchIds{cond_idx}, MultiFileAchVecs{iFile}(iTau).Id{iLen});
-                SimilarityMat(iTau).Id{iLen} = [SimilarityMat(iTau).Id{iLen}  ConditionsAchIds{cond_idx}(train_samples_inx_Len)];
+                SimilarityMat(iTau).Id{iLen} = [SimilarityMat(iTau).Id{iLen}  MultiFileAchVecs{iFile}(iTau).Id{iLen}];
             end
         end
     end
@@ -101,7 +65,7 @@ for iTau = usedTauInfo.tau_idxs
 end %for iTau
 
 if saveFlg
-    save([output_fp fileInfo.orig_fn '_similarity.mat'],'MultiFileAchVecs','SimilarityMat','TestingSet','-v7.3');
+    save([output_fp fileInfo.orig_fn '_similarity.mat'],'MultiFileAchVecs','SimilarityMat','-v7.3');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -149,4 +113,7 @@ function SimilarityMat = calc_similarity_mat(SimilarityMat, MultiFileAchVecs, iT
         end
         SimilarityMat(iTau).Mat{iLen} = SimilarityMat(iTau).Mat{iLen} + SimilarityMat(iTau).Mat{iLen}';
     end
+    
+%     plot_hist = plot_hist + v1;
+%     figure;stem([plot_hist(max_inx,:)/max(plot_hist(max_inx,:))/0.5; v]');legend('cluster histogram','vector');title(['cluster: ' num2str(cluster_num(iLen)) '   similarity: ' num2str(cluster_sim(iLen))]);  
     
