@@ -68,11 +68,11 @@ for iCrossValid = 1:length(TrainingSets)
             end
         end
         
-        concat_cluster_id_prefix_Len = 10^ceil(log10(concat_max_nof_clusters_Len));
+        ClusteringData(iTau).concat_cluster_id_prefix_Len = 10^ceil(log10(concat_max_nof_clusters_Len));
         ClusteringData(iTau).Id{nofMat+1} = [];
         ClusteringData(iTau).Clusters{nofMat+1} = [];
         for iLen = 1:nofMat-1
-            ClusteringData(iTau).Clusters{nofMat+1} = [ClusteringData(iTau).Clusters{nofMat+1};  (concat_cluster_id_prefix_Len*iLen)+ClusteringData(iTau).Clusters{iLen}];
+            ClusteringData(iTau).Clusters{nofMat+1} = [ClusteringData(iTau).Clusters{nofMat+1};  (ClusteringData(iTau).concat_cluster_id_prefix_Len*iLen)+ClusteringData(iTau).Clusters{iLen}];
             ClusteringData(iTau).Id{nofMat+1} = [ClusteringData(iTau).Id{nofMat+1}  ClusteringData(iTau).Id{iLen}];
         end
         fig_name = ['Concatinated Different Length - \tau '  num2str(ClusteringData(iTau).tau)   '  ' fileInfo.orig_fn];

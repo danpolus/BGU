@@ -22,6 +22,7 @@ params_t.reasonable_nof_clusters = 100;
 params_t.max_nof_clusters = Inf; % 15 Inf
 params_t.minimal_contrast = 0.5;
 
+params_t.accTypes = {'TotalAccum', 'ThreshAccum', 'EpochAccum', 'SampLimitAccum'};
 %minimal_similarity_threshold : to decide if matching cluster found and avoid anti-similarity. has to be >0
 switch params_t.similarity_method
     case 'jaccard'

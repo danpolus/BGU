@@ -43,7 +43,7 @@ parfor iFile = 1:length(files)
     if saveLog
         fprintf(fid, '%s    2_extract_avalanches: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});
     end
-    AvalancheFileDataSets = extract_avalanches(EEGSets, 0);   
+    AvalancheFileDataSets = extract_avalanches(EEGSets, 0);
     if saveLog
         fprintf(fid, '%s    3_get_avalanche_vectors: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});
     end
@@ -77,25 +77,19 @@ parfor iFile = 1:length(files)
 %     [fn, fp] = uigetfile([fp '*.mat'], 'Select clustering results file');
 %     load([fp fn],'ClusteringDataSets','MultiFileAchVecs','TrainValidTest');
 %     ValidationClusteringDataSets = ClusteringDataSets;
+%     FinalClusteringDataSet = ClusteringDataSets;
 
     if saveLog
       fprintf(fid, '%s    7_get_testing_clusters: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});
     end
-    [ValidationTrainingClusterSets, ValidationTestingClusterSets] = get_testing_clusters(ValidationClusteringDataSets, MultiFileAchVecs, SimilarityMat, {TrainValidTest.CrossValid.TrainingSet}, {TrainValidTest.CrossValid.TestingSet}, 'valid', 1);
-    [FinalTrainingClusterSet, FinalTestingClusterSet] = get_testing_clusters(FinalClusteringDataSet, MultiFileAchVecs, SimilarityMat, {TrainValidTest.TrainingSet}, {TrainValidTest.TestingSet}, 'final', 1);
-    
-%     %load TestingSetClusters, TrainingSetClusters, ClusteringDataSets from mat file 
-%     [fn, fp] = uigetfile([fp '*.mat'], 'Select testing clusters file');
-%     load([fp fn],'TestingSetClusters','TrainingSetClusters','ClusteringDataSets');
-%     ValidationClusteringDataSets = ClusteringDataSets;
-%     ValidationTrainingClusterSets = TrainingSetClusters;
-%     ValidationTestingClusterSets = TestingSetClusters;
-
+    [ValidationTrainingClusterSets, ValidationTestingClusterSets] = get_testing_clusters(ValidationClusteringDataSets, MultiFileAchVecs, SimilarityMat, {TrainValidTest.CrossValid.TrainingSet}, {TrainValidTest.CrossValid.TestingSet});
+    [FinalTrainingClusterSet, FinalTestingClusterSet] = get_testing_clusters(FinalClusteringDataSet, MultiFileAchVecs, SimilarityMat, {TrainValidTest.TrainingSet}, {TrainValidTest.TestingSet});
     if saveLog
         fprintf(fid, '%s    8_predict_conditions: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});
     end
     ValidTrainPredictionResults = predict_conditions(ValidationTrainingClusterSets, ValidationClusteringDataSets, 'validTrain', 0, 0);
     ValidTestPredictionResults = predict_conditions(ValidationTestingClusterSets, ValidationClusteringDataSets, 'validTest', 1, 0);
+    FinalTrainPredictionResults = predict_conditions(FinalTrainingClusterSet, FinalClusteringDataSet, 'finalTrain', 0, 0);
     FinalTestPredictionResults = predict_conditions(FinalTestingClusterSet, FinalClusteringDataSet, 'finalTest', 1, 0);
 
 end
@@ -107,3 +101,4 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 profile viewer
+profile off

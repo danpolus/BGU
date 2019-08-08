@@ -65,7 +65,7 @@ for iTau = usedTauInfo.tau_idxs
 end %for iTau
 
 if saveFlg
-    save([output_fp fileInfo.orig_fn '_similarity.mat'],'MultiFileAchVecs','SimilarityMat','-v7.3');
+    save([output_fp fileInfo.orig_fn '_similarity.mat'],'MultiFileAchVecs','SimilarityMat','usedTauInfo','-v7.3');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
