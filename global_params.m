@@ -18,21 +18,20 @@ params_t.taus_to_use = 'optimal_multi_files'; %'all' 'optimal_per_file' 'optimal
 
 params_t.test_set_percent = 0.15; % consider equalizing trainig sets: 10% for 4 conditions, 40% for 6 conditions, or equalizing testing sets: 15% for 4 conditions, 10% for 6 conditions
 
-params_t.reasonable_nof_clusters = 100;
-params_t.max_nof_clusters = Inf; % 15 Inf
-params_t.minimal_contrast = 0.5;
+params_t.max_nof_clusters_per_condition = 3; %10^6;%take max contrast
+params_t.nof_clusters_optimization = 'limit'; % scaled limit
+params_t.maximal_distance_threshold = 1 - 0;% 1 - 1/2; %for cases when there is same similarity all over the matrix
 
 params_t.accTypes = {'TotalAccum', 'ThreshAccum', 'EpochAccum', 'SampLimitAccum'};
 %minimal_similarity_threshold : to decide if matching cluster found and avoid anti-similarity. has to be >0
 switch params_t.similarity_method
     case 'jaccard'
-        params_t.minimal_similarity_threshold = 0.5;
+        params_t.minimal_similarity_threshold = 1/3; %1/2; %0; %1/3;%3 times the radius for normalized
     case 'correlation'
-        params_t.minimal_similarity_threshold = 10^-6;
+        params_t.minimal_similarity_threshold = 0;
     case 'levenshtein'
-        params_t.minimal_similarity_threshold = 0.5;
+        params_t.minimal_similarity_threshold = 1/2;
 end
-nof_thresh_to_test = 10;
-% params_t.condition_descision_threshold = linspace(0,6,nof_thresh_to_test);  %average-based salience (to chose this method, search 'average-based salience' through project files)
-params_t.condition_descision_threshold = linspace(0.5,1,nof_thresh_to_test);  %contrast-based salience (to chose this method, search 'contrast-based salience' through project files)
-params_t.condition_counter_limit = round(linspace(1,30,nof_thresh_to_test));
+params_t.condition_descision_threshold = 0:0.5:5;
+params_t.condition_counter_limit = [1 2 4 8 16 32 64 128 512 1024];
+params_t.check_prediction_salience = true;

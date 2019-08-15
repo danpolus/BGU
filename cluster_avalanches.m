@@ -61,7 +61,7 @@ for iCrossValid = 1:length(TrainingSets)
                 fig_name = ['Full Matrix - \tau '  num2str(ClusteringData(iTau).tau)   '  ' fileInfo.orig_fn];
             end
             ClusteringData(iTau).Id{iLen} = TrainSimilarityMat(iTau).Id{iLen};
-            ClusteringData(iTau).Clusters{iLen} = similarity_mat_2_clusters(TrainSimilarityMat(iTau).Mat{iLen}, fig_name, params_t, plotFlg);
+            ClusteringData(iTau).Clusters{iLen} = similarity_mat_2_clusters(TrainSimilarityMat(iTau).Mat{iLen}, length(TrainingSets{iCrossValid}(iTau).CondIds), fig_name, params_t, plotFlg);
             ClusteringData(iTau).Stats{iLen} = clusters_statistics(ClusteringData(iTau).Clusters{iLen}, ClusteringData(iTau).Id{iLen}, TrainingSets{iCrossValid}(iTau), fig_name, 0);
             if iLen < nofMat
                 concat_max_nof_clusters_Len = max([concat_max_nof_clusters_Len; ClusteringData(iTau).Clusters{iLen}]);
@@ -132,9 +132,15 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function T_opt = similarity_mat_2_clusters(sim_M, fig_name, params_t, plotFlg)
+function T_opt = similarity_mat_2_clusters(sim_M, nofCond, fig_name, params_t, plotFlg)
 
-similarity_dist_threshold = 0.5; %for cases when there is same distance all over the matrix
+if strcmp(params_t.nof_clusters_optimization,'limit')
+    max_nof_clusters = round(nofCond*params_t.max_nof_clusters_per_condition);
+elseif strcmp(params_t.nof_clusters_optimization,'scaled')
+    max_nof_clusters = round(nofCond*params_t.max_nof_clusters_per_condition)*2;  %multiply by 2 to set upper limit
+else
+    error('nof_clusters_optimization');
+end
 
 if numel(sim_M) == 0
     T_opt = [];
@@ -142,6 +148,7 @@ elseif numel(sim_M) == 1
     T_opt = 1;
 else
     N = size(sim_M,1);
+
     sim_M = min(1,sim_M);
     sim_M = ~eye(N,N).*sim_M; %put zeros on diagonal
     dist_v = squareform(~eye(N,N).*(1-sim_M),'tovector'); %convert to ditance, put zeros on diagonal, convert to vector
@@ -150,7 +157,7 @@ else
     %divide to clusters
     clusters_distance = unique(cluster_tree(:,3));
     if length(clusters_distance) == 1
-        if clusters_distance <= similarity_dist_threshold
+        if clusters_distance < params_t.maximal_distance_threshold
             T_opt = ones(N,1); %single cluster
         else
             T_opt = (1:N)'; %all separate clusters
@@ -162,19 +169,15 @@ else
     for iCut=2:length(clusters_distance)
         cutoff = (clusters_distance(iCut)+clusters_distance(iCut-1))/2;
         T = cluster(cluster_tree,'cutoff',cutoff,'criterion','distance');
-        D_in = 0; D_in_cnt = 0;
-        for iClust = unique(T)'
-            D_in = D_in + sum(sum(sim_M(T==iClust, T==iClust)));
-            D_in_cnt = D_in_cnt + sum(T==iClust)^2;
-        end
-        D_out = (sum(sum(sim_M)) - D_in)/(N*N - D_in_cnt);
-        D_in = D_in/D_in_cnt;
-        C = (D_in-D_out)/(D_in+D_out);
-        
-        if C >= params_t.minimal_contrast
-            NofsClusters = [NofsClusters max(T)];
-            Cutoffs = [Cutoffs cutoff];
-            Contrasts = [Contrasts C];
+        nofClusters = max(T);
+        if nofClusters <= max_nof_clusters
+            C = calc_contrast(T,sim_M);
+            %C = calc_silhouette(T,sim_M);
+            if C > 0 && C <= 1
+                NofsClusters = [NofsClusters nofClusters];
+                Cutoffs = [Cutoffs cutoff];
+                Contrasts = [Contrasts C];
+            end
         end
     end
     %     cutoff_opt = 0.9;
@@ -188,27 +191,36 @@ else
         [NofsClusters, sort_inces] = sort(NofsClusters);
         Contrasts = Contrasts(sort_inces);
         Cutoffs = Cutoffs(sort_inces);
-        NofsClusters_scaled = log10(NofsClusters)/log10(params_t.reasonable_nof_clusters);
-        %NofsClusters_scaled = (NofsClusters_scaled - log10(2)/log10(params_t.reasonable_nof_clusters)) / (1-log10(2)/log10(params_t.reasonable_nof_clusters)); %scale log[2:reasonable_nof_clusters]
-        if min(NofsClusters_scaled)<1
-            NofsClusters_scaled = (NofsClusters_scaled - min(NofsClusters_scaled)) / (1-min(NofsClusters_scaled)); %scale log[min dynamic range:reasonable_nof_clusters]
-        else
-            error('min(NofsClusters_scaled)>=1');
-        end
-        %Contrasts_scaled = (Contrasts-params_t.minimal_contrast) / (1-params_t.minimal_contrast); %mininal contrast scaling
-        Contrasts_scaled = (Contrasts-min(Contrasts)) / (max(Contrasts)-min(Contrasts)); %dynamic range scaling
-        if isinf(params_t.max_nof_clusters)
-            [~, opt_inx] = min(sqrt((0-NofsClusters_scaled).^2 + (1-Contrasts_scaled).^2)); % find minimal distance to (0,1)
-        else
-            [~, opt_inx] = max(Contrasts(NofsClusters <= params_t.max_nof_clusters));
-            if isempty(opt_inx)
-                opt_inx = 1;
-            end
+        if strcmp(params_t.nof_clusters_optimization,'limit')
+            [~, opt_inx] = max(Contrasts);          
+        elseif strcmp(params_t.nof_clusters_optimization,'scaled')
+%             %scale and find minimal distance to (0,1)
+%             reasonable_nof_clusters = 100;
+%             minimal_contrast = 0;
+%             NofsClusters_scaled = log10(NofsClusters)/log10(reasonable_nof_clusters);
+%             %NofsClusters_scaled = (NofsClusters_scaled - log10(2)/log10(reasonable_nof_clusters)) / (1-log10(2)/log10(reasonable_nof_clusters)); %scale log[2:reasonable_nof_clusters]
+%             if min(NofsClusters_scaled)<1
+%                 NofsClusters_scaled = (NofsClusters_scaled - min(NofsClusters_scaled)) / (1-min(NofsClusters_scaled)); %scale log[min dynamic range:reasonable_nof_clusters]
+%             else
+%                 error('min(NofsClusters_scaled)>=1');
+%             end
+%             %Contrasts_scaled = (Contrasts-minimal_contrast) / (1-minimal_contrast); %mininal contrast scaling
+%             Contrasts_scaled = (Contrasts-min(Contrasts)) / (max(Contrasts)-min(Contrasts)); %dynamic range scaling
+%             [~, opt_inx] = min(sqrt((0-NofsClusters_scaled).^2 + (1-Contrasts_scaled).^2)); %scaled minimal distance to (1,1)
+            
+%             D = (1+Contrasts)./(1-Contrasts); %proportional dynamic range scaling
+%             Contrasts_scaled = (D-min(D)) / (max(D)-min(D));
+
+            Contrasts_scaled = (Contrasts-min(Contrasts)) / (max(Contrasts)-min(Contrasts)); %dynamic range scaling
+            
+%             Contrasts_scaled = Contrasts; %not scaled
+
+            [~, opt_inx] = min(sqrt((1 - 1./NofsClusters).^2 + (1 - Contrasts_scaled).^2)); %scaled minimal distance to (1,1)
         end
     elseif length(NofsClusters) == 1
         sort_inces = 1; opt_inx = 1;
-    else %clustering failed due to low contrast
-        if max(clusters_distance) <= similarity_dist_threshold
+    else %clustering failed due to low contrast or high nof clusters
+        if max(clusters_distance) < params_t.maximal_distance_threshold
             T_opt = ones(N,1); %single cluster
         else
             T_opt = (1:N)'; %all separate clusters
@@ -221,7 +233,8 @@ else
     if plotFlg
         figure('Name',fig_name);
         subplot(2,2,1);imagesc(sim_M);title('original');colorbar;
-        subplot(2,2,3);plot(log10(NofsClusters),Contrasts, log10(NofsClusters(opt_inx)),Contrasts(opt_inx), 'xr');xlabel('log10(nof clusters)');ylabel('contrast');title('Contrast');
+%         subplot(2,2,3);plot(log10(NofsClusters),Contrasts, log10(NofsClusters(opt_inx)),Contrasts(opt_inx), 'xr');xlabel('log10(nof clusters)');ylabel('contrast');title('Contrast');        
+        subplot(2,2,3);plot(NofsClusters,Contrasts, NofsClusters(opt_inx),Contrasts(opt_inx), 'xr');xlabel('#clusters');ylabel('contrast');title('Contrast');
         subplot(2,2,4);[~,T_dend,perm_dend] = dendrogram(cluster_tree, NofsClusters(opt_inx), 'ColorThreshold',Cutoffs(opt_inx), 'Orientation','left');
         title(['cutoff distance = ' num2str(Cutoffs(opt_inx)) '  contrast = ' num2str(Contrasts(opt_inx)) '  nof clusters = ' num2str(NofsClusters(opt_inx))]);
         T_perm = [];
@@ -242,6 +255,39 @@ else
         %             figure;plot(NofsClusters,Contrasts(sort_inces), NofsClusters(opt_inx),Contrasts(sort_inces(opt_inx)),'xk');
     end
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function C = calc_contrast(T,sim_M)
+
+N = size(sim_M,1);
+D_in = 0; D_in_cnt = 0;
+for iClust = unique(T)'
+    D_in = D_in + sum(sum(sim_M(T==iClust, T==iClust)));
+    D_in_cnt = D_in_cnt + sum(T==iClust)*(sum(T==iClust)-1); %don't count diagonal
+end
+D_out = (sum(sum(sim_M)) - D_in)/(N*(N-1) - D_in_cnt);
+D_in = D_in/D_in_cnt;
+C = (D_in-D_out)/(D_in+D_out);
+if isempty(C) || isnan(C)
+    C = 0;
+end
+
+%%%%%%%%%%
+
+function S = calc_silhouette(T,sim_M)
+
+for i = 1:size(sim_M,1)
+    a = sum(sim_M(i,T==T(i)))/(sum(T==T(i))-1);
+    b = [];
+    for iClust = unique(T(T~=T(i)))'
+        b(iClust) = sum(sim_M(i,T==iClust))/sum(T==iClust);
+    end
+    S(i) = (a-max(b)) / max([a b]);
+    if isempty(S(i)) || isnan(S(i)) || isinf(S(i))
+        S(i) = 0;
+    end
+end
+S = mean(S);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

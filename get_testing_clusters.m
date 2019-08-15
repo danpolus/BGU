@@ -167,7 +167,7 @@ for iLen = lenInx
             end
         end
     end
-    [cluster_sim(iLen),cluster_num(iLen)] = max(normalized_mean_sim);%max(mean_sim);max(max_sim);
-    cluster_sim(iLen) = mean_sim(cluster_num(iLen)); %max_sim(cluster_num(iLen));
+    [cluster_sim(iLen),cluster_num(iLen)] = max(normalized_mean_sim);%max(mean_sim);max(max_sim);max(normalized_mean_sim);
+    cluster_sim(iLen) = min(1,cluster_sim(iLen));
 
 end

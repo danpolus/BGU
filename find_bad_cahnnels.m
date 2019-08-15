@@ -28,7 +28,7 @@ if nargin <= 2
     warning('find_bad_cahnnels had no action');
     help find_bad_cahnnels;
     return;
-end;
+end
 if mod(nargin,2) == 1
     warning('Odd number of input arguments')
     help find_bad_cahnnels;
