@@ -6,15 +6,19 @@ fp = 'D:\My Files\Work\BGU\datasets\Panas\';
 params_t = global_params();
 
 thresh_inx = round(length(params_t.condition_descision_threshold)/2);
-cntlmt_inx = round(length(params_t.condition_counter_limit)/2);
+cntlmt_inx = find(params_t.condition_counter_limit == 512);
 
 debug_len_to_plot = [];
+file_string_filter = 'finalTestPredict';%'finalTrainPredict';'finalTestPredict';'validTestPredict';'validTrainPredict';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 [files, fp] = uigetfile([fp '*.mat'], 'Select results data files', 'MultiSelect','on');
 if ~iscell(files) %in case only 1 file selected
     files = {files};
 end
+fp
+
+files = files(contains(files,file_string_filter)); 
 
 plotLenInx = [debug_len_to_plot  max([0 debug_len_to_plot])+1  max([0 debug_len_to_plot])+2];
 
@@ -34,7 +38,7 @@ for iFile = 1:length(files)
             P_cond(iFile,iCrossValid,:) = ClusteringDataSets{iCrossValid}(iTau).Stats{1}.P_cond;
             if isempty(CondIds)
                 for iCond = 1:length(PredictionResultSets{1}(iTau).CondIds)
-                    CondIds{iCond} = PredictionResultSets{1}(iTau).CondIds{iCond}(end-7:end);
+                    CondIds{iCond} = ['C' PredictionResultSets{1}(iTau).CondIds{iCond}(end-4) PredictionResultSets{1}(iTau).CondIds{iCond}(end)];
                 end
             end
             
@@ -111,9 +115,9 @@ for iLen = plotLenInx
             crosss_valid_tp_kappa_std(iFile) = sqrt(mean(diag(P_condValidMat*(kappaMat' - mu).^2)) * numel(kappaMat)/(numel(kappaMat)-1)); %unbiased
             
             subplot(2,nof_files,iFile);bar(1:nof_cond,crosss_valid_conditions_median);hold on;
-            errorbar(1:nof_cond,crosss_valid_conditions_median,crosss_valid_conditions_std,'LineStyle','none');hold off;xticklabels(CondIds);title([files{iFile}(1:end-4) ': cross-validation median']);
+            errorbar(1:nof_cond,crosss_valid_conditions_median,crosss_valid_conditions_std,'LineStyle','none');hold off;xticklabels(CondIds);title([files{iFile}(1:6) ': x-valid median']);
             subplot(2,nof_files,nof_files+iFile);bar(1:nof_cond,crosss_valid_conditions_kappa);hold on;
-            errorbar(1:nof_cond,crosss_valid_conditions_kappa,crosss_valid_conditions_kappa_std,'LineStyle','none');xticklabels(CondIds);title('cross-validation median Kappa');
+            errorbar(1:nof_cond,crosss_valid_conditions_kappa,crosss_valid_conditions_kappa_std,'LineStyle','none');xticklabels(CondIds);title('x-valid median Kappa');
         end
         
         crosss_subj_conditions_median = median(tpConditionsAllFileMat,1);
@@ -129,8 +133,16 @@ for iLen = plotLenInx
         
         figure('Name',['inter-subject results:  Len = ' len_str '  ' params_t.accTypes{iAccum}]);
         subplot(1,2,1);bar(1:nof_files,crosss_valid_tp_median);hold on;
-        errorbar(1:nof_files,crosss_valid_tp_median,crosss_valid_tp_std,'LineStyle','none');hold off;xlabel('subjects');title(['detection rate cross-validation median. average: ' num2str(mean(crosss_valid_tp_median))]);
+        errorbar(1:nof_files,crosss_valid_tp_median,crosss_valid_tp_std,'LineStyle','none');hold off;xlabel('subjects');title(['tp x-valid median. average: ' num2str(mean(crosss_valid_tp_median),'%.2f')]);
         subplot(1,2,2);bar(1:nof_files,crosss_valid_tp_kappa_median);hold on;
-        errorbar(1:nof_files,crosss_valid_tp_kappa_median,crosss_valid_tp_kappa_std,'LineStyle','none');xlabel('subjects');title(['detection rate cross-validation median Kappa. average: ' num2str(mean(crosss_valid_tp_kappa_median))]);
+        errorbar(1:nof_files,crosss_valid_tp_kappa_median,crosss_valid_tp_kappa_std,'LineStyle','none');xlabel('subjects');title(['tp x-valid median Kappa. average: ' num2str(mean(crosss_valid_tp_kappa_median),'%.2f')]);
+        display(' ');
+        display(['inter-subject results:  Len = ' len_str '  ' params_t.accTypes{iAccum}]);
+        display(['subjects mean: ' num2str(crosss_valid_tp_median,'% 1.2f')]);
+        display(['subjects std:  ' num2str(crosss_valid_tp_std,'% 1.2f')]);
+        display(['inter-subject mean: ' num2str(mean(crosss_valid_tp_median),'% 1.2f')   ' std: ' num2str(std(crosss_valid_tp_median),'% 1.2f')]);
+        display(['kappa mean:    ' num2str(crosss_valid_tp_kappa_median,'% 1.2f')]);
+        display(['kappa std:     ' num2str(crosss_valid_tp_kappa_std,'% 1.2f')]);  
+        display(['inter-subject kappa mean: ' num2str(mean(crosss_valid_tp_kappa_median),'% 1.2f')   ' std: ' num2str(std(crosss_valid_tp_kappa_median),'% 1.2f')]);
     end
 end

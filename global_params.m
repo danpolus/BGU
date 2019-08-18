@@ -26,7 +26,7 @@ params_t.accTypes = {'TotalAccum', 'ThreshAccum', 'EpochAccum', 'SampLimitAccum'
 %minimal_similarity_threshold : to decide if matching cluster found and avoid anti-similarity. has to be >0
 switch params_t.similarity_method
     case 'jaccard'
-        params_t.minimal_similarity_threshold = 1/3; %1/2; %0; %1/3;%3 times the radius for normalized
+        params_t.minimal_similarity_threshold = 1/2; %1/2; %0; %1/3;%3 times the radius for normalized
     case 'correlation'
         params_t.minimal_similarity_threshold = 0;
     case 'levenshtein'
@@ -34,4 +34,4 @@ switch params_t.similarity_method
 end
 params_t.condition_descision_threshold = 0:0.5:5;
 params_t.condition_counter_limit = [1 2 4 8 16 32 64 128 512 1024];
-params_t.check_prediction_salience = true;
+params_t.check_prediction_salience = false;

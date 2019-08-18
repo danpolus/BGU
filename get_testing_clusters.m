@@ -138,7 +138,7 @@ for iLen = lenInx
     
     max_sim = zeros(1,max(clusters));
     mean_sim = zeros(1,max(clusters));
-    normalized_mean_sim = zeros(1,max(clusters));
+%     normalized_mean_sim = zeros(1,max(clusters));
     for iClust = clusters'
         if iLen < nofLen
             ach_idx = contains(SimilarityMat.Id{iLen}, avalanche_vec.id);
@@ -153,21 +153,21 @@ for iLen = lenInx
         max_sim(iClust) = max(similarities);
         if max_sim(iClust) == 1 %exact match -> cluster found
             mean_sim(iClust) = 1;
-            normalized_mean_sim(iClust) = Inf;
+%             normalized_mean_sim(iClust) = Inf;
             break;
         else
             mean_sim(iClust) = mean(similarities);
-            if ~isempty(ClustersMat{iLen}(iClust).mean) && ClustersMat{iLen}(iClust).mean > 0
-                normalized_mean_sim(iClust) = mean_sim(iClust)/ClustersMat{iLen}(iClust).mean;
-            else
-                normalized_mean_sim(iClust) = mean_sim(iClust)/mean([ClustersMat{iLen}.mean]);
-                if isnan(normalized_mean_sim(iClust)) || isinf(normalized_mean_sim(iClust))
-                    normalized_mean_sim(iClust) = mean_sim(iClust);
-                end
-            end
+%             if ~isempty(ClustersMat{iLen}(iClust).mean) && ClustersMat{iLen}(iClust).mean > 0
+%                 normalized_mean_sim(iClust) = mean_sim(iClust)/ClustersMat{iLen}(iClust).mean;
+%             else
+%                 normalized_mean_sim(iClust) = mean_sim(iClust)/mean([ClustersMat{iLen}.mean]);
+%                 if isnan(normalized_mean_sim(iClust)) || isinf(normalized_mean_sim(iClust))
+%                     normalized_mean_sim(iClust) = mean_sim(iClust);
+%                 end
+%             end
         end
     end
-    [cluster_sim(iLen),cluster_num(iLen)] = max(normalized_mean_sim);%max(mean_sim);max(max_sim);max(normalized_mean_sim);
+    [cluster_sim(iLen),cluster_num(iLen)] = max(mean_sim);%max(mean_sim);max(max_sim);max(normalized_mean_sim);
     cluster_sim(iLen) = min(1,cluster_sim(iLen));
 
 end
