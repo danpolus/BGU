@@ -1,5 +1,5 @@
 %
-%Step 5 : create_train_test_sets
+%Step 5.2 : create_train_test_sets
 %
 %  inputs:
 % MultiFileAchVecs - avalanche vectors from all sets
@@ -31,14 +31,16 @@ for iTau = usedTauInfo.tau_idxs
     CondIds = {};
     ConditionsEpochIds = {};
     for iFile = 1:length(MultiFileAchVecs)
-        cond_idx = find(contains(CondIds, MultiFileAchVecs{iFile}(iTau).file_id(1:17)));
-        if isempty(cond_idx)
-            CondIds = [CondIds {MultiFileAchVecs{iFile}(iTau).file_id(1:17)}];
-            cond_idx = length(CondIds);
-            ConditionsEpochIds{cond_idx} = [];
-        end
-        for iEpoch=1:length(MultiFileAchVecs{iFile}(iTau).epochs_vecs)
-            ConditionsEpochIds{cond_idx} = [ConditionsEpochIds{cond_idx} {[MultiFileAchVecs{iFile}(iTau).file_id(18:end) 'epc' num2str(iEpoch,'%03d')]}];
+        if ~isempty(MultiFileAchVecs{iFile}(iTau).file_id)
+            cond_idx = find(contains(CondIds, MultiFileAchVecs{iFile}(iTau).file_id(1:17)));
+            if isempty(cond_idx)
+                CondIds = [CondIds {MultiFileAchVecs{iFile}(iTau).file_id(1:17)}];
+                cond_idx = length(CondIds);
+                ConditionsEpochIds{cond_idx} = [];
+            end
+            for iEpoch=1:length(MultiFileAchVecs{iFile}(iTau).epochs_vecs)
+                ConditionsEpochIds{cond_idx} = [ConditionsEpochIds{cond_idx} {[MultiFileAchVecs{iFile}(iTau).file_id(18:end) 'epc' num2str(iEpoch,'%03d')]}];
+            end
         end
     end
     

@@ -90,6 +90,7 @@ for iFile = 1:length(files)
         if saveLog
             fprintf(fid, '%s    5_create_train_test_sets: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});
         end
+        [MultiFileAchVecs, SimilarityMat] = unite_exclude_conditions(MultiFileAchVecs, SimilarityMat, usedTauInfo, 1);
         TrainValidTest = create_train_test_sets(MultiFileAchVecs, usedTauInfo);
         if saveLog
             fprintf(fid, '%s    6_cluster_avalanches: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});
@@ -134,5 +135,5 @@ if saveLog
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-profile viewer
-profile off
+% profile viewer
+% profile off

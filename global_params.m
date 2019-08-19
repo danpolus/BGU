@@ -16,6 +16,12 @@ params_t.raster_input_type = 'binary'; % 'binary' 'events_cnt' 'amplitude' -> se
 params_t.similarity_method = 'jaccard'; % 'jaccard' 'correlation' 'levenshtein'  -> set to appear in folder name as well
 params_t.taus_to_use = 'optimal_multi_files'; %'all' 'optimal_per_file' 'optimal_multi_files'
 
+params_t.contitionsExclude = {'cnd1wrd1', 'cnd1wrd2', 'cnd1wrd3'}; 
+% params_t.contitionsExclude = [];
+% params_t.contitionsUnite{1} = {'cnd1wrd1', 'cnd1wrd2', 'cnd1wrd3'};
+% params_t.contitionsUnite{2} = {'cnd2wrd1', 'cnd2wrd2', 'cnd2wrd3'};
+params_t.contitionsUnite = [];
+
 params_t.test_set_percent = 0.15; % consider equalizing trainig sets: 10% for 4 conditions, 40% for 6 conditions, or equalizing testing sets: 15% for 4 conditions, 10% for 6 conditions
 
 params_t.max_nof_clusters_per_condition = 3; %10^6;%take max contrast
