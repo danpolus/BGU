@@ -8,13 +8,13 @@ profile off
 
 %when need to load 2 files from different folders
 middleRun = [];
-middleRun.sufix1 = '_avalanches.mat';
-middleRun.sufix2 = '_similarity.mat';
-middleRun.folder2 = '3 similarity';
-% middleRun.sufix1 = '_similarity.mat';
-% middleRun.sufix2 = '_validTrainClusters.mat';
-% middleRun.sufix3 = '_finalTrainClusters.mat';
-% middleRun.folder2 = '4 clusters';
+% middleRun.sufix1 = '_avalanches.mat';
+% middleRun.sufix2 = '_similarity.mat';
+% middleRun.folder2 = '3 similarity';
+middleRun.sufix1 = '_similarity.mat';
+middleRun.sufix2 = '_validTrainClusters.mat';
+middleRun.sufix3 = '_finalTrainClusters.mat';
+middleRun.folder2 = '4 clusters';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if saveLog
@@ -81,11 +81,11 @@ for iFile = 1:length(files)
 %         load([fp fn],'MultiFileAchVecs','SimilarityMat');
 
 
-    else %if isempty(middleRun)        
-        load([fp files{iFile}],'MultiFileAchVecs','usedTauInfo');
-        base_fn = files{iFile}(1:end-length(middleRun.sufix1));
-        load([middleRun.base_fp  middleRun.folder2 '\' base_fn  middleRun.sufix2],'MultiFileAchVecs','SimilarityMat');
-    end
+%     else %if isempty(middleRun)        
+%         load([fp files{iFile}],'MultiFileAchVecs','usedTauInfo');
+%         base_fn = files{iFile}(1:end-length(middleRun.sufix1));
+%         load([middleRun.base_fp  middleRun.folder2 '\' base_fn  middleRun.sufix2],'MultiFileAchVecs','SimilarityMat');
+%     end
     
         if saveLog
             fprintf(fid, '%s    5_create_train_test_sets: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});
@@ -104,14 +104,14 @@ for iFile = 1:length(files)
 %     ValidationClusteringDataSets = ClusteringDataSets;
 %     FinalClusteringDataSet = ClusteringDataSets;
 
-%     else %if isempty(middleRun)        
-%         load([fp files{iFile}],'MultiFileAchVecs','SimilarityMat');
-%         base_fn = files{iFile}(1:end-length(middleRun.sufix1));
-%         load([middleRun.base_fp  middleRun.folder2 '\' base_fn  middleRun.sufix2],'ClusteringDataSets','MultiFileAchVecs','TrainValidTest');
-%         ValidationClusteringDataSets = ClusteringDataSets;
-%         load([middleRun.base_fp  middleRun.folder2 '\' base_fn  middleRun.sufix3],'ClusteringDataSets','MultiFileAchVecs','TrainValidTest');
-%         FinalClusteringDataSet = ClusteringDataSets;        
-%     end
+    else %if isempty(middleRun)        
+        load([fp files{iFile}],'MultiFileAchVecs','SimilarityMat');
+        base_fn = files{iFile}(1:end-length(middleRun.sufix1));
+        load([middleRun.base_fp  middleRun.folder2 '\' base_fn  middleRun.sufix2],'ClusteringDataSets','MultiFileAchVecs','TrainValidTest');
+        ValidationClusteringDataSets = ClusteringDataSets;
+        load([middleRun.base_fp  middleRun.folder2 '\' base_fn  middleRun.sufix3],'ClusteringDataSets','MultiFileAchVecs','TrainValidTest');
+        FinalClusteringDataSet = ClusteringDataSets;        
+    end
     
     if saveLog
         fprintf(fid, '%s    7_get_testing_clusters: %s\n', datestr(now, 'yyyy/mm/dd HH:MM:SS.FFF'), files{iFile});

@@ -9,7 +9,7 @@ thresh_inx = round(length(params_t.condition_descision_threshold)/2);
 cntlmt_inx = find(params_t.condition_counter_limit == 512);
 
 debug_len_to_plot = [];
-file_string_filter = 'finalTestPredict';%'finalTrainPredict';'finalTestPredict';'validTestPredict';'validTrainPredict';
+file_string_filter = 'finalTestPredict';%'finalTestPredict';'finalTrainPredict';'validTestPredict';'validTrainPredict';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 [files, fp] = uigetfile([fp '*.mat'], 'Select results data files', 'MultiSelect','on');

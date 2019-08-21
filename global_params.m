@@ -16,8 +16,9 @@ params_t.raster_input_type = 'binary'; % 'binary' 'events_cnt' 'amplitude' -> se
 params_t.similarity_method = 'jaccard'; % 'jaccard' 'correlation' 'levenshtein'  -> set to appear in folder name as well
 params_t.taus_to_use = 'optimal_multi_files'; %'all' 'optimal_per_file' 'optimal_multi_files'
 
-params_t.contitionsExclude = {'cnd1wrd1', 'cnd1wrd2', 'cnd1wrd3'}; 
-% params_t.contitionsExclude = [];
+% params_t.contitionsExclude = {'cnd1wrd1', 'cnd1wrd2', 'cnd1wrd3'}; 
+% params_t.contitionsExclude = {'cnd1wrd2', 'cnd1wrd3', 'cnd2wrd2', 'cnd2wrd3'};
+params_t.contitionsExclude = [];
 % params_t.contitionsUnite{1} = {'cnd1wrd1', 'cnd1wrd2', 'cnd1wrd3'};
 % params_t.contitionsUnite{2} = {'cnd2wrd1', 'cnd2wrd2', 'cnd2wrd3'};
 params_t.contitionsUnite = [];
@@ -28,7 +29,7 @@ params_t.max_nof_clusters_per_condition = 3; %10^6;%take max contrast
 params_t.nof_clusters_optimization = 'limit'; % scaled limit
 params_t.maximal_distance_threshold = 1 - 0;% 1 - 1/2; %for cases when there is same similarity all over the matrix
 
-params_t.accTypes = {'TotalAccum', 'ThreshAccum', 'EpochAccum', 'SampLimitAccum'};
+params_t.accTypes = {'TotalAccum','ThreshAccum', 'EpochAccum', 'SampLimitAccum'};
 %minimal_similarity_threshold : to decide if matching cluster found and avoid anti-similarity. has to be >0
 switch params_t.similarity_method
     case 'jaccard'
