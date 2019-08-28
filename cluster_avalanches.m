@@ -232,16 +232,17 @@ else
     
     if plotFlg
         figure('Name',fig_name);
-        subplot(2,2,1);imagesc(sim_M);title('original');colorbar;
+        sim_M = sim_M + eye(size(sim_M));
+        subplot(2,2,1);imagesc(sim_M);title('original');colorbar;set(gca,'FontSize',16);
 %         subplot(2,2,3);plot(log10(NofsClusters),Contrasts, log10(NofsClusters(opt_inx)),Contrasts(opt_inx), 'xr');xlabel('log10(nof clusters)');ylabel('contrast');title('Contrast');        
-        subplot(2,2,3);plot(NofsClusters,Contrasts, NofsClusters(opt_inx),Contrasts(opt_inx), 'xr');xlabel('#clusters');ylabel('contrast');title('Contrast');
-        subplot(2,2,4);[~,T_dend,perm_dend] = dendrogram(cluster_tree, NofsClusters(opt_inx), 'ColorThreshold',Cutoffs(opt_inx), 'Orientation','left');
-        title(['cutoff distance = ' num2str(Cutoffs(opt_inx)) '  contrast = ' num2str(Contrasts(opt_inx)) '  nof clusters = ' num2str(NofsClusters(opt_inx))]);
+        subplot(2,2,3);plot(NofsClusters,Contrasts, NofsClusters(opt_inx),Contrasts(opt_inx), 'xr');xlabel('#clusters');ylabel('contrast');title(['max contrast = ' num2str(Contrasts(opt_inx),'%.2f')]);set(gca,'FontSize',16);box off;
+        subplot(2,2,4);[~,T_dend,perm_dend] = dendrogram(cluster_tree, NofsClusters(opt_inx), 'ColorThreshold',Cutoffs(opt_inx), 'Orientation','left');set(gca,'FontSize',16);
+        title(['cutoff distance = ' num2str(Cutoffs(opt_inx),'%.2f')  '  nof clusters = ' num2str(NofsClusters(opt_inx))]);
         T_perm = [];
         for iClust = perm_dend
             T_perm = [T_perm; find(T_dend==iClust)];
         end
-        subplot(2,2,2);imagesc(sim_M(T_perm,T_perm));title('clustered');colorbar;
+        subplot(2,2,2);imagesc(sim_M(T_perm,T_perm));title('clustered');colorbar;set(gca,'FontSize',16);
         
         %     mtd = 'average';  %'average' 'weighted'
         %     cluster_tree = linkage(dist_v,mtd);
@@ -326,15 +327,24 @@ Stats.P_clondGINVclst(isnan(Stats.P_clondGINVclst)) = 0;
 Stats.P_clstGINVcond(isnan(Stats.P_clstGINVcond)) = 0;
 
 if plotFlg
+    %CondIds = {'rest1','rest2','rest3','word1','word2','word3'};
+    CondIds = Stats.CondIds;
     figure('Name',fig_name);
-    for i=1:size(clstVScond,1)
+    nofRows = ceil(size(clstVScond,1)/2);
+    for i=1:nofRows
         pie_labels = string(1:size(clstVScond,2));
         if length(pie_labels) <= 1
             pie_labels = {pie_labels};
         end
         if sum(clstVScond(i,:)) > 0
-            subplot(ceil(size(clstVScond,1)/2),2,i); pie(clstVScond(i,:),pie_labels);
-            title(Stats.CondIds(i));
+            subplot(nofRows,2,2*i-1); pie(clstVScond(i,:),pie_labels);
+            title(CondIds(i));
         end
+        set(gca,'FontSize',16);
+        if sum(clstVScond(nofRows+i,:)) > 0 && 2*i <= size(clstVScond,1)
+            subplot(nofRows,2,2*i); pie(clstVScond(nofRows+i,:),pie_labels);
+            title(CondIds(nofRows+i));
+        end
+        set(gca,'FontSize',16);
     end
 end

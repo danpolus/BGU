@@ -222,7 +222,9 @@ if predictor.ach_cnt(end) > 0 && max_prob > log10(Stats.P_cond(max_inx)) %above 
 end
 if ~isempty(plot_title)
     figure;plot(predictor.conditions_prob_log10_history');xlabel('step');title(['Accumulators - ' plot_title ' predicted condition: ' num2str(predictor.decision_cond(end))]);
+    box off;set(gca,'FontSize',16);
     legend('cond 1','cond 2','cond 3','cond 4', 'cond 5', 'cond 6');
+    %legend('word 1', 'word 2', 'word 3');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

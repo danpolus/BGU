@@ -25,10 +25,17 @@ plotLenInx = [debug_len_to_plot  max([0 debug_len_to_plot])+1  max([0 debug_len_
 allSubjectsResults = [];
 P_cond = [];
 CondIds = [];
+SubIds = [];
 for iFile = 1:length(files)
     
     load([fp files{iFile}],'PredictionResultSets','ClusteringDataSets');
 
+    s_id = ['S' files{iFile}(5)];
+    if ~isempty(str2num(files{iFile}(6)))
+        s_id = [s_id files{iFile}(6)];
+    end
+    SubIds = [SubIds {s_id}];
+    
     for iCrossValid = 1:length(PredictionResultSets)
         for iTau = 1:length(PredictionResultSets{iCrossValid})
             if isempty(PredictionResultSets{iCrossValid}(iTau).tau)
@@ -133,9 +140,9 @@ for iLen = plotLenInx
         
         figure('Name',['inter-subject results:  Len = ' len_str '  ' params_t.accTypes{iAccum}]);
         subplot(1,2,1);bar(1:nof_files,crosss_valid_tp_median);hold on;
-        errorbar(1:nof_files,crosss_valid_tp_median,crosss_valid_tp_std,'LineStyle','none');hold off;xlabel('subjects');title(['tp x-valid median. average: ' num2str(mean(crosss_valid_tp_median),'%.2f')]);
+        errorbar(1:nof_files,crosss_valid_tp_median,crosss_valid_tp_std,'LineStyle','none');hold off;xticklabels(SubIds);title(['Detection Rate,  average: ' num2str(mean(crosss_valid_tp_median),'%.2f')]); box off;set(gca,'FontSize',16);
         subplot(1,2,2);bar(1:nof_files,crosss_valid_tp_kappa_median);hold on;
-        errorbar(1:nof_files,crosss_valid_tp_kappa_median,crosss_valid_tp_kappa_std,'LineStyle','none');xlabel('subjects');title(['tp x-valid median Kappa. average: ' num2str(mean(crosss_valid_tp_kappa_median),'%.2f')]);
+        errorbar(1:nof_files,crosss_valid_tp_kappa_median,crosss_valid_tp_kappa_std,'LineStyle','none');xticklabels(SubIds);title(['Kappa, average: ' num2str(mean(crosss_valid_tp_kappa_median),'%.2f')]); box off;set(gca,'FontSize',16);
         display(' ');
         display(['inter-subject results:  Len = ' len_str '  ' params_t.accTypes{iAccum}]);
         display(['subjects mean: ' num2str(crosss_valid_tp_median,'% 1.2f')]);

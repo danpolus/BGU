@@ -154,7 +154,7 @@ for iEegSets = 1:length(EEGSets)
             subplot(2,3,1);histogram(all_epochs(iTau).av_size_vec,max(all_epochs(iTau).av_size_vec));title(['Avalanche Size  \tau = ' num2str(dataInfo.tau_vec(iTau))]);
             subplot(2,3,4);histogram(all_epochs(iTau).av_dur_vec,max(all_epochs(iTau).av_dur_vec));title(['Avalanche Duration  \tau = ' num2str(dataInfo.tau_vec(iTau))]);
             
-            subplot(2,3,2); RasterPlot(all_epochs(iTau).av_raster,param.Fs,dataInfo.tau_vec(iTau));title(['\tau = ' num2str(dataInfo.tau_vec(iTau)) ' - Raster']); drawnow
+            subplot(2,3,2); RasterPlot(all_epochs(iTau).av_raster,param.Fs,dataInfo.tau_vec(iTau));xlabel('sec');ylabel('channels');title(['\tau = ' num2str(1000*dataInfo.tau_vec(iTau)) ' - Raster Plot (all trials)']); drawnow
             subplot(2,3,3); RasterPlot(all_epochs(iTau).av_raster,param.Fs,dataInfo.tau_vec(iTau),[param.t1 param.t2]);title('zoom in'); drawnow
             subplot(2,3,5); stem(R(:,iTau));xlabel('Channel #');ylabel('Events/sec');title('Event rate in each channel');set(gca,'XLim',[1 size(all_epochs(iTau).av_raster,1)]);
             
@@ -163,17 +163,18 @@ for iEegSets = 1:length(EEGSets)
             subplot(2,3,6); loglog(ES_edges1,size_dist,'LineWidth',2); hold on; loglog(xx,yy,'k--','LineWidth',3); hold off;
             set(gca,'XLim',[0 310]);
             xlabel('S');ylabel('P(S)');
-            title(['\tau = ' num2str(1000*dataInfo.tau_vec(iTau)) ' ms' ', \alpha = ' num2str(all_epochs(iTau).alpha) ', \sigma = ' num2str(all_epochs(iTau).sigma)]);
+            title(['\tau = ' num2str(1000*dataInfo.tau_vec(iTau)) ' ms' ', \alpha = ' num2str(-all_epochs(iTau).alpha) ]);box off;
             
         end
         
-        figure('Name',EEG.setname);scatter([all_epochs.sigma],-[all_epochs.alpha],'x');xlabel('\sigma');ylabel('\alpha');title('\alpha = F(\sigma)  labels: \tau values [sec]');
+        figure('Name',EEG.setname);scatter([all_epochs.sigma],-[all_epochs.alpha],'x');xlabel('\sigma');ylabel('\alpha');title('\alpha vs \sigma :    \tau values [msec]');
         hold on
         scatter([all_epochs(tau_optimal_inx).sigma],-[all_epochs(tau_optimal_inx).alpha],'dk','filled');
-        text([all_epochs.sigma]+0.01,-[all_epochs.alpha],strsplit(num2str(dataInfo.tau_vec)));
+        text([all_epochs.sigma]+0.01,-[all_epochs.alpha],strsplit(num2str(1000*dataInfo.tau_vec)));
         plot([min(params_t.optimal_sigma,min([all_epochs.sigma]))-0.1, max(params_t.optimal_sigma,max([all_epochs.sigma]))+0.1],[params_t.optimal_alpha,params_t.optimal_alpha],'--m',...
             [params_t.optimal_sigma,params_t.optimal_sigma],[min(params_t.optimal_alpha,min(-[all_epochs.alpha]))-0.1, max(params_t.optimal_alpha,max(-[all_epochs.alpha]))+0.1],'--m');
         hold off
+        box off;set(gca,'FontSize',16);
     end
     
     
